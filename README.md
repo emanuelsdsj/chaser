@@ -42,7 +42,7 @@ and how to parse it. Think of it as a self-contained crawl job.
 ## Install
 
 ```bash
-pip install chaser
+# not ready yet — check back soon
 ```
 
 ## Development setup
