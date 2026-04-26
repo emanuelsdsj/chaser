@@ -3,14 +3,19 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from chaser.engine import trap
 from chaser.frontier.queue import Frontier
+from chaser.hooks.base import RequestAborted
 from chaser.item.base import Item
 from chaser.net.client import CircuitOpenError, FetchError, NetClient
 from chaser.net.request import Request
 from chaser.trapper.base import Trapper
+
+if TYPE_CHECKING:
+    from chaser.hooks.base import FetchHook
+    from chaser.hooks.retry import RetryPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +43,8 @@ class Engine:
         timeout: float = 30.0,
         max_connections: int = 100,
         proxy: str | None = None,
+        hooks: list[FetchHook] | None = None,
+        retry: RetryPolicy | None = None,
     ) -> None:
         self._concurrency = concurrency
         self._net_kwargs: dict[str, Any] = {
@@ -45,9 +52,11 @@ class Engine:
             "timeout": timeout,
             "max_connections": max_connections,
             "proxy": proxy,
+            "hooks": hooks or [],
         }
         self._frontier = Frontier(strategy=strategy)  # type: ignore[arg-type]
         self._items: list[Item] = []
+        self._retry = retry
 
     async def run(self, trappers: Sequence[Trapper] | Trapper) -> list[Item]:
         """Run the crawl and return collected items.
@@ -97,14 +106,24 @@ class Engine:
         trapper_map: dict[str, Trapper],
         request: Request,
     ) -> None:
-        try:
-            response = await net.fetch(request)
-        except CircuitOpenError as exc:
-            logger.debug("Circuit open — skipping %s (%s)", request.url, exc)
-            return
-        except FetchError as exc:
-            logger.warning("Fetch failed — %s: %s", request.url, exc)
-            return
+        attempt = 0
+        while True:
+            try:
+                response = await net.fetch(request)
+                break
+            except CircuitOpenError as exc:
+                logger.debug("Circuit open — skipping %s (%s)", request.url, exc)
+                return
+            except RequestAborted as exc:
+                logger.debug("Request aborted by hook — %s: %s", request.url, exc)
+                return
+            except FetchError as exc:
+                if self._retry and self._retry.should_retry(attempt, exc):
+                    await self._retry.wait(attempt)
+                    attempt += 1
+                else:
+                    logger.warning("Fetch failed — %s: %s", request.url, exc)
+                    return
 
         trapper_name = request.meta.get("trapper", "")
         trapper = trapper_map.get(trapper_name)
