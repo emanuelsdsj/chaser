@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import time
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
 from chaser.net.headers import Headers
 from chaser.net.request import Request
 from chaser.net.response import Response
+
+if TYPE_CHECKING:
+    from chaser.hooks.base import FetchHook
 
 
 class CircuitState(Enum):
@@ -96,6 +99,7 @@ class NetClient:
         circuit_breaker_recovery: float = 30.0,
         follow_redirects: bool = True,
         verify: bool = True,
+        hooks: list[FetchHook] | None = None,
     ) -> None:
         self._http2 = http2
         self._timeout = timeout
@@ -110,6 +114,7 @@ class NetClient:
         self._cb_recovery = circuit_breaker_recovery
         self._breakers: dict[str, CircuitBreaker] = {}
         self._client: httpx.AsyncClient | None = None
+        self._hooks: list[FetchHook] = hooks or []
 
     def _make_client(self) -> httpx.AsyncClient:
         kwargs: dict[str, Any] = {
@@ -145,6 +150,9 @@ class NetClient:
         if self._client is None:
             raise RuntimeError("NetClient must be used as an async context manager")
 
+        for hook in self._hooks:
+            request = await hook.before_request(request)
+
         host = httpx.URL(request.url).host
         breaker = self._breaker_for(host)
 
@@ -167,7 +175,7 @@ class NetClient:
         breaker.record_success()
 
         encoding = raw.encoding or "utf-8"
-        return Response(
+        response = Response(
             url=str(raw.url),
             status=raw.status_code,
             headers=Headers(dict(raw.headers)),
@@ -176,6 +184,11 @@ class NetClient:
             elapsed=elapsed,
             request=request,
         )
+
+        for hook in self._hooks:
+            response = await hook.after_response(response)
+
+        return response
 
     def circuit_breaker(self, host: str) -> CircuitBreaker:
         """Expose the breaker for a given host (useful for monitoring/testing)."""
