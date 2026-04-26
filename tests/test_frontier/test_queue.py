@@ -44,11 +44,7 @@ class TestBloomFilter:
         for i in range(capacity):
             bf.add(f"http://seen.com/page/{i}")
 
-        false_positives = sum(
-            1
-            for i in range(capacity)
-            if f"http://unseen.com/item/{i}" in bf
-        )
+        false_positives = sum(1 for i in range(capacity) if f"http://unseen.com/item/{i}" in bf)
         actual_fpr = false_positives / capacity
         # Allow 3× the declared rate as headroom — still many orders of magnitude from random
         assert actual_fpr <= error_rate * 3, f"FPR too high: {actual_fpr:.4f}"

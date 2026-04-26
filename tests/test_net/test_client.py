@@ -117,9 +117,7 @@ class TestNetClientFetch:
 
     @respx.mock
     async def test_response_url_follows_redirects(self) -> None:
-        respx.get("http://example.com/old").mock(
-            return_value=httpx.Response(200, content=b"")
-        )
+        respx.get("http://example.com/old").mock(return_value=httpx.Response(200, content=b""))
         async with NetClient(http2=False) as client:
             resp = await client.fetch(Request("http://example.com/old"))
 
@@ -177,6 +175,7 @@ class TestNetClientFetch:
         client = NetClient()
         with pytest.raises(RuntimeError):
             import asyncio
+
             asyncio.get_event_loop().run_until_complete(
                 client.fetch(Request("http://example.com/"))
             )

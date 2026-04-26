@@ -98,9 +98,7 @@ class _RaisingTrpper(Trapper):
 class TestEngineRun:
     @respx.mock
     async def test_simple_crawl_returns_items(self) -> None:
-        respx.get("http://example.com/").mock(
-            return_value=httpx.Response(200, content=b"hello")
-        )
+        respx.get("http://example.com/").mock(return_value=httpx.Response(200, content=b"hello"))
         engine = Engine(concurrency=1, http2=False)
         items = await engine.run(_SimpleTrpper(["http://example.com/"]))
 
@@ -145,9 +143,7 @@ class TestEngineRun:
 
         engine = Engine(concurrency=2, http2=False)
         # broken.com fetch fails — engine should still return items from ok.com
-        items = await engine.run(
-            _SimpleTrpper(["http://ok.com/", "http://broken.com/"])
-        )
+        items = await engine.run(_SimpleTrpper(["http://ok.com/", "http://broken.com/"]))
         assert len(items) == 1
         assert items[0].url == "http://ok.com/"  # type: ignore[union-attr]
 
@@ -174,14 +170,10 @@ class TestEngineRun:
     @respx.mock
     async def test_multiple_start_urls(self) -> None:
         for i in range(3):
-            respx.get(f"http://page{i}.com/").mock(
-                return_value=httpx.Response(200, content=b"")
-            )
+            respx.get(f"http://page{i}.com/").mock(return_value=httpx.Response(200, content=b""))
 
         engine = Engine(concurrency=3, http2=False)
-        items = await engine.run(
-            _SimpleTrpper([f"http://page{i}.com/" for i in range(3)])
-        )
+        items = await engine.run(_SimpleTrpper([f"http://page{i}.com/" for i in range(3)]))
         assert len(items) == 3
 
 

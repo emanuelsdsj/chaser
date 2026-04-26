@@ -38,10 +38,7 @@ class Trapper(ABC):
         """
         from chaser.net.request import Request
 
-        return [
-            Request(url=url, meta={"trapper": self.name})
-            for url in self.start_urls
-        ]
+        return [Request(url=url, meta={"trapper": self.name}) for url in self.start_urls]
 
     @abstractmethod
     async def parse(self, response: Response) -> AsyncIterator[ParseYield]:
