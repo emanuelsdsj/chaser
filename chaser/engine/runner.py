@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Sequence
+from contextlib import nullcontext
 from typing import TYPE_CHECKING, Any
 
 from chaser.engine import trap
@@ -16,6 +17,7 @@ from chaser.trapper.base import Trapper
 if TYPE_CHECKING:
     from chaser.hooks.base import FetchHook
     from chaser.hooks.retry import RetryPolicy
+    from chaser.pipeline.base import Pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,7 @@ class Engine:
         proxy: str | None = None,
         hooks: list[FetchHook] | None = None,
         retry: RetryPolicy | None = None,
+        pipeline: Pipeline | None = None,
     ) -> None:
         self._concurrency = concurrency
         self._net_kwargs: dict[str, Any] = {
@@ -57,6 +60,7 @@ class Engine:
         self._frontier = Frontier(strategy=strategy)  # type: ignore[arg-type]
         self._items: list[Item] = []
         self._retry = retry
+        self._pipeline = pipeline
 
     async def run(self, trappers: Sequence[Trapper] | Trapper) -> list[Item]:
         """Run the crawl and return collected items.
@@ -69,26 +73,28 @@ class Engine:
 
         trapper_map: dict[str, Trapper] = {t.name: t for t in trappers}
 
-        async with NetClient(**self._net_kwargs) as net:
-            for trapper in trappers:
-                for req in trapper.start_requests():
-                    req.meta.setdefault("trapper", trapper.name)
-                    await self._frontier.push(req)
+        pipeline_ctx = self._pipeline.run() if self._pipeline else nullcontext()
+        async with pipeline_ctx:
+            async with NetClient(**self._net_kwargs) as net:
+                for trapper in trappers:
+                    for req in trapper.start_requests():
+                        req.meta.setdefault("trapper", trapper.name)
+                        await self._frontier.push(req)
 
-            if self._frontier.empty():
-                logger.warning("No start requests found — nothing to crawl")
-                return self._items
+                if self._frontier.empty():
+                    logger.warning("No start requests found — nothing to crawl")
+                    return self._items
 
-            workers = [
-                asyncio.create_task(self._worker(net, trapper_map))
-                for _ in range(self._concurrency)
-            ]
+                workers = [
+                    asyncio.create_task(self._worker(net, trapper_map))
+                    for _ in range(self._concurrency)
+                ]
 
-            await self._frontier.join()
+                await self._frontier.join()
 
-            for w in workers:
-                w.cancel()
-            await asyncio.gather(*workers, return_exceptions=True)
+                for w in workers:
+                    w.cancel()
+                await asyncio.gather(*workers, return_exceptions=True)
 
         return self._items
 
@@ -140,7 +146,10 @@ class Engine:
                 result.meta.setdefault("trapper", trapper_name)
                 await self._frontier.push(result)
             elif isinstance(result, Item):
-                self._items.append(result)
+                if self._pipeline is not None:
+                    await self._pipeline.process(result)
+                else:
+                    self._items.append(result)
             else:
                 logger.warning(
                     "Trapper %r yielded unexpected type %s — ignoring",
