@@ -74,27 +74,26 @@ class Engine:
         trapper_map: dict[str, Trapper] = {t.name: t for t in trappers}
 
         pipeline_ctx = self._pipeline.run() if self._pipeline else nullcontext()
-        async with pipeline_ctx:
-            async with NetClient(**self._net_kwargs) as net:
-                for trapper in trappers:
-                    for req in trapper.start_requests():
-                        req.meta.setdefault("trapper", trapper.name)
-                        await self._frontier.push(req)
+        async with pipeline_ctx, NetClient(**self._net_kwargs) as net:
+            for trapper in trappers:
+                for req in trapper.start_requests():
+                    req.meta.setdefault("trapper", trapper.name)
+                    await self._frontier.push(req)
 
-                if self._frontier.empty():
-                    logger.warning("No start requests found — nothing to crawl")
-                    return self._items
+            if self._frontier.empty():
+                logger.warning("No start requests found — nothing to crawl")
+                return self._items
 
-                workers = [
-                    asyncio.create_task(self._worker(net, trapper_map))
-                    for _ in range(self._concurrency)
-                ]
+            workers = [
+                asyncio.create_task(self._worker(net, trapper_map))
+                for _ in range(self._concurrency)
+            ]
 
-                await self._frontier.join()
+            await self._frontier.join()
 
-                for w in workers:
-                    w.cancel()
-                await asyncio.gather(*workers, return_exceptions=True)
+            for w in workers:
+                w.cancel()
+            await asyncio.gather(*workers, return_exceptions=True)
 
         return self._items
 
