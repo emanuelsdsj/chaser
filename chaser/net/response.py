@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from chaser.net.headers import Headers
 
 if TYPE_CHECKING:
+    from chaser.extract.selector import Selector
     from chaser.net.request import Request
 
 
@@ -34,6 +35,12 @@ class Response:
 
     def json(self, **kwargs: Any) -> Any:
         return _json.loads(self.body, **kwargs)
+
+    @property
+    def selector(self) -> Selector:
+        from chaser.extract.selector import Selector
+
+        return Selector.from_response(self)
 
     def __repr__(self) -> str:
         return f"<Response [{self.status}] {self.url}>"
