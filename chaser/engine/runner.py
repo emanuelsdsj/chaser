@@ -89,9 +89,11 @@ class Engine:
         pipeline_ctx = self._pipeline.run() if self._pipeline else nullcontext()
         browser_ctx: Any = self._make_browser_ctx() if self._use_browser else nullcontext()
 
-        async with browser_ctx as browser_client, pipeline_ctx, NetClient(
-            **self._net_kwargs
-        ) as net:
+        async with (
+            browser_ctx as browser_client,
+            pipeline_ctx,
+            NetClient(**self._net_kwargs) as net,
+        ):
             for trapper in trappers:
                 for req in trapper.start_requests():
                     req.meta.setdefault("trapper", trapper.name)
