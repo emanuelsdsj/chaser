@@ -83,3 +83,43 @@ def test_repr_contains_status_and_url():
 def test_request_reference_none_by_default():
     r = resp()
     assert r.request is None
+
+
+def test_urljoin_absolute_path():
+    r = resp(url="https://example.com/blog/post-1")
+    assert r.urljoin("/about") == "https://example.com/about"
+
+
+def test_urljoin_relative_path():
+    r = resp(url="https://example.com/blog/")
+    assert r.urljoin("post-2") == "https://example.com/blog/post-2"
+
+
+def test_urljoin_already_absolute():
+    r = resp(url="https://example.com/")
+    assert r.urljoin("https://other.com/page") == "https://other.com/page"
+
+
+def test_json_selector_jmespath():
+    import json
+
+    payload = {"products": [{"name": "widget", "price": 9.99}, {"name": "gadget", "price": 19.99}]}
+    r = resp(body=json.dumps(payload).encode())
+    names = r.json_selector.jmespath("products[*].name").getall()
+    assert names == ["widget", "gadget"]
+
+
+def test_json_selector_jmespath_nested():
+    import json
+
+    payload = {"store": {"books": [{"title": "A"}, {"title": "B"}]}}
+    r = resp(body=json.dumps(payload).encode())
+    titles = r.json_selector.jmespath("store.books[*].title").getall()
+    assert titles == ["A", "B"]
+
+
+def test_json_selector_jmespath_no_match():
+    import json
+
+    r = resp(body=json.dumps({"a": 1}).encode())
+    assert r.json_selector.jmespath("missing.key").getall() == []

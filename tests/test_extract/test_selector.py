@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import json as _json
 import re
 
 import pytest
 
-from chaser.extract.selector import Selector
+from chaser.extract.selector import Selector, SelectorList
 from chaser.net.headers import Headers
 from chaser.net.response import Response
 
@@ -167,3 +168,38 @@ def test_response_selector_property() -> None:
 def test_response_selector_is_selector_instance() -> None:
     resp = _make_response(HTML)
     assert isinstance(resp.selector, Selector)
+
+
+# ---------------------------------------------------------------------------
+# JMESPath
+# ---------------------------------------------------------------------------
+
+
+def _json_selector(data: object) -> Selector:
+    return Selector(_json.dumps(data), type="json")
+
+
+def test_jmespath_simple_key() -> None:
+    s = _json_selector({"name": "chaser", "version": "1.0"})
+    assert s.jmespath("name").get() == "chaser"
+
+
+def test_jmespath_list_projection() -> None:
+    s = _json_selector({"items": [{"id": 1}, {"id": 2}, {"id": 3}]})
+    assert s.jmespath("items[*].id").getall() == [1, 2, 3]
+
+
+def test_jmespath_nested_path() -> None:
+    s = _json_selector({"a": {"b": {"c": "deep"}}})
+    assert s.jmespath("a.b.c").get() == "deep"
+
+
+def test_jmespath_no_match_returns_empty() -> None:
+    s = _json_selector({"x": 1})
+    assert s.jmespath("missing").getall() == []
+
+
+def test_jmespath_returns_selector_list() -> None:
+    s = _json_selector({"tags": ["a", "b"]})
+    result = s.jmespath("tags")
+    assert isinstance(result, SelectorList)
