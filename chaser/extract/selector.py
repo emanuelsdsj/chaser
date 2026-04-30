@@ -81,6 +81,7 @@ class Selector:
         *,
         base_url: str = "",
         encoding: str = "utf-8",
+        type: str = "html",  # noqa: A002
     ) -> None:
         if isinstance(text_or_inner, parsel.Selector):
             self._inner = text_or_inner
@@ -89,6 +90,7 @@ class Selector:
                 text=text_or_inner,
                 base_url=base_url,
                 encoding=encoding,
+                type=type,
             )
 
     @classmethod
@@ -100,6 +102,17 @@ class Selector:
 
     def xpath(self, query: str, **kwargs: Any) -> SelectorList:
         return SelectorList(self._inner.xpath(query, **kwargs))
+
+    def jmespath(self, query: str, **kwargs: Any) -> SelectorList:
+        """Query JSON data using JMESPath syntax.
+
+        Only meaningful on selectors created with ``type="json"`` (e.g. via
+        ``response.json_selector``).
+
+            sel = response.json_selector
+            sel.jmespath("items[*].name").getall()
+        """
+        return SelectorList(self._inner.jmespath(query, **kwargs))
 
     def re(self, pattern: str | _re.Pattern[str]) -> list[str]:
         return self._inner.re(pattern)  # type: ignore[return-value]
