@@ -24,6 +24,7 @@ class Trapper(ABC):
 
     name: str = ""
     start_urls: list[str] = []
+    custom_settings: dict[str, Any] = {}
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)

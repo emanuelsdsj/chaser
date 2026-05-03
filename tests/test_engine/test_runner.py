@@ -249,6 +249,55 @@ class TestTrapperLifecycle:
         assert closed_b == [True]
 
 
+class TestCustomSettings:
+    @respx.mock
+    async def test_user_agent_injected_from_custom_settings(self) -> None:
+        captured: list[str] = []
+
+        def _capture(req: httpx.Request, *_: object) -> httpx.Response:
+            captured.append(req.headers.get("user-agent", ""))
+            return httpx.Response(200, content=b"")
+
+        respx.get("http://example.com/").mock(side_effect=_capture)
+
+        class _UATrpper(_SimpleTrpper):
+            name = "ua"
+            custom_settings = {"user_agent": "mybot/1.0"}
+
+        engine = Engine(concurrency=1, http2=False)
+        await engine.run(_UATrpper(["http://example.com/"]))
+        assert captured == ["mybot/1.0"]
+
+    @respx.mock
+    async def test_existing_user_agent_not_overridden(self) -> None:
+        captured: list[str] = []
+
+        def _capture(req: httpx.Request, *_: object) -> httpx.Response:
+            captured.append(req.headers.get("user-agent", ""))
+            return httpx.Response(200, content=b"")
+
+        respx.get("http://example.com/").mock(side_effect=_capture)
+
+        class _UATrpper(_SimpleTrpper):
+            name = "uaexisting"
+            custom_settings = {"user_agent": "mybot/1.0"}
+
+            def start_requests(self) -> list[Request]:
+                from chaser.net.headers import Headers
+
+                return [
+                    Request(
+                        url="http://example.com/",
+                        headers=Headers({"user-agent": "explicit/2.0"}),
+                        meta={"trapper": self.name},
+                    )
+                ]
+
+        engine = Engine(concurrency=1, http2=False)
+        await engine.run(_UATrpper([]))
+        assert captured == ["explicit/2.0"]
+
+
 class TestTrapperBase:
     def test_name_auto_derived_from_class(self) -> None:
         class MyFancyTrpper(Trapper):

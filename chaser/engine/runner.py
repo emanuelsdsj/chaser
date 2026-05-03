@@ -155,6 +155,20 @@ class Engine:
     ) -> None:
         self.stats.requests_sent += 1
 
+        trapper_name = request.meta.get("trapper", "")
+        trapper = trapper_map.get(trapper_name)
+        if trapper is not None and trapper.custom_settings:
+            delay = trapper.custom_settings.get("download_delay")
+            if delay:
+                await asyncio.sleep(float(delay))
+            user_agent = trapper.custom_settings.get("user_agent")
+            if user_agent and "user-agent" not in {k.lower() for k in request.headers}:
+                from chaser.net.headers import Headers
+
+                request = request.copy(
+                    headers=Headers({**dict(request.headers), "user-agent": user_agent})
+                )
+
         if request.use_browser:
             if browser_client is None:
                 logger.warning(
@@ -177,8 +191,6 @@ class Engine:
         if response is None:
             return
 
-        trapper_name = request.meta.get("trapper", "")
-        trapper = trapper_map.get(trapper_name)
         if trapper is None:
             logger.warning(
                 "No trapper %r registered for %s — dropping response",
