@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import code
 import importlib
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 
@@ -17,7 +17,7 @@ app = typer.Typer(
 )
 
 
-def _import_trapper(target: str) -> object:
+def _import_trapper(target: str) -> type[Any]:
     """Import a Trapper class from 'module.path:ClassName' notation."""
     if ":" not in target:
         typer.echo(
@@ -33,7 +33,7 @@ def _import_trapper(target: str) -> object:
         typer.echo(f"Error: cannot import module {module_path!r}: {exc}", err=True)
         raise typer.Exit(1) from exc
 
-    cls = getattr(module, class_name, None)
+    cls: type[Any] | None = getattr(module, class_name, None)
     if cls is None:
         typer.echo(
             f"Error: {class_name!r} not found in module {module_path!r}",
@@ -66,11 +66,11 @@ def run(
     from chaser.engine.runner import Engine
 
     cls = _import_trapper(trapper)
-    trapper_instance = cls()  # type: ignore[call-arg]
+    trapper_instance = cls()
 
     engine = Engine(
         concurrency=concurrency,
-        strategy=strategy,  # type: ignore[arg-type]
+        strategy=strategy,
         http2=not no_http2,
         timeout=timeout,
         proxy=proxy,
@@ -126,7 +126,7 @@ def shell(
     }
 
     try:
-        import IPython  # type: ignore[import-untyped]
+        import IPython
 
         IPython.start_ipython(argv=[], user_ns=local_vars, display_banner=False)
         typer.echo(banner, err=True)

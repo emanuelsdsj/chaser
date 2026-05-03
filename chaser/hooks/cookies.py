@@ -48,7 +48,7 @@ class CookieJarHook(FetchHook):
             bucket = self._jar.setdefault(domain, {})
             for line in raw_header.split("\n"):
                 if line.strip():
-                    parsed: SimpleCookie[str] = SimpleCookie()
+                    parsed: SimpleCookie = SimpleCookie()
                     parsed.load(line)
                     for key, morsel in parsed.items():
                         bucket[key] = morsel.value

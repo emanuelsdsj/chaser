@@ -38,7 +38,8 @@ def _read_chaser_table(pyproject_path: Path | None = None) -> dict[str, Any]:
     try:
         with target.open("rb") as fh:
             raw = tomllib.load(fh)
-        return raw.get("tool", {}).get("chaser", {})
+        result: dict[str, Any] = raw.get("tool", {}).get("chaser", {})
+        return result
     except Exception:
         return {}
 

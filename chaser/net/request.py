@@ -22,7 +22,7 @@ class Request:
     def __post_init__(self) -> None:
         self.method = self.method.upper()
         if not isinstance(self.headers, Headers):
-            self.headers = Headers(self.headers)  # type: ignore[arg-type]
+            self.headers = Headers(self.headers)
 
     @classmethod
     def from_form(

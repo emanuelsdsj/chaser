@@ -24,7 +24,7 @@ class Response:
 
     def __post_init__(self) -> None:
         if not isinstance(self.headers, Headers):
-            self.headers = Headers(self.headers)  # type: ignore[arg-type]
+            self.headers = Headers(self.headers)
 
     @property
     def text(self) -> str:

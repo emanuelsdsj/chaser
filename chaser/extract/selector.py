@@ -26,20 +26,20 @@ class SelectorList:
         return SelectorList(self._inner.xpath(query, **kwargs))
 
     def get(self, default: str | None = None) -> str | None:
-        return self._inner.get(default=default)  # type: ignore[return-value]
+        return self._inner.get(default=default)
 
     def getall(self) -> list[str]:
-        return self._inner.getall()  # type: ignore[return-value]
+        return self._inner.getall()
 
     def re(self, pattern: str | _re.Pattern[str]) -> list[str]:
-        return self._inner.re(pattern)  # type: ignore[return-value]
+        return self._inner.re(pattern)
 
     def re_first(
         self,
         pattern: str | _re.Pattern[str],
         default: str | None = None,
     ) -> str | None:
-        return self._inner.re_first(pattern, default=default)  # type: ignore[return-value]
+        return self._inner.re_first(pattern, default=default)
 
     @property
     def attrib(self) -> dict[str, str]:
@@ -115,24 +115,25 @@ class Selector:
         return SelectorList(self._inner.jmespath(query, **kwargs))
 
     def re(self, pattern: str | _re.Pattern[str]) -> list[str]:
-        return self._inner.re(pattern)  # type: ignore[return-value]
+        return self._inner.re(pattern)
 
     def re_first(
         self,
         pattern: str | _re.Pattern[str],
         default: str | None = None,
     ) -> str | None:
-        return self._inner.re_first(pattern, default=default)  # type: ignore[return-value]
+        return self._inner.re_first(pattern, default=default)
 
     @property
     def attrib(self) -> dict[str, str]:
         return dict(self._inner.attrib)
 
     def get(self, default: str | None = None) -> str | None:
-        return self._inner.get(default=default)  # type: ignore[return-value]
+        result: str | None = self._inner.get()
+        return result if result is not None else default
 
     def getall(self) -> list[str]:
-        return self._inner.getall()  # type: ignore[return-value]
+        return self._inner.getall()
 
     def __repr__(self) -> str:
         return f"<Selector ({self._inner.type})>"
