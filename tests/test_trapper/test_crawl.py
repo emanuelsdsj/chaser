@@ -195,9 +195,7 @@ async def test_depth_limit_stops_following_links() -> None:
 
 @pytest.mark.asyncio
 async def test_depth_limit_none_follows_all() -> None:
-    resp = _response_at_depth(
-        "https://example.com/", _html("https://example.com/page"), depth=100
-    )
+    resp = _response_at_depth("https://example.com/", _html("https://example.com/page"), depth=100)
     results = [r async for r in _SimpleCrawl().parse(resp)]
     requests = [r for r in results if isinstance(r, Request)]
     assert len(requests) == 1
