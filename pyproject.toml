@@ -4,11 +4,26 @@ build-backend = "hatchling.build"
 
 [project]
 name = "chaser"
-version = "0.0.1"
+dynamic = ["version"]
 description = "A fast, reliable web crawling framework built on modern Python asyncio"
 readme = "README.md"
-license = { text = "MIT" }
+license = { file = "LICENSE" }
 requires-python = ">=3.11"
+authors = [{ name = "Emanuel", email = "emanuelsdsj@gmail.com" }]
+keywords = ["web crawling", "scraping", "asyncio", "http", "spider"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Framework :: AsyncIO",
+    "Typing :: Typed",
+]
 dependencies = [
     "httpx[http2]>=0.27",
     "httpx-socks>=0.7",
@@ -41,6 +56,10 @@ chaser = "chaser.cli.main:app"
 [project.urls]
 Homepage = "https://github.com/emanuelsds/chaser"
 Issues = "https://github.com/emanuelsds/chaser/issues"
+Changelog = "https://github.com/emanuelsds/chaser/blob/main/CHANGELOG.md"
+
+[tool.hatch.version]
+path = "chaser/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["chaser"]
