@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
@@ -29,6 +29,9 @@ jobs:
 
       - name: Format check (ruff format)
         run: ruff format --check chaser tests
+
+      - name: Type check (mypy)
+        run: mypy chaser
 
       - name: Run tests
         run: pytest --cov=chaser --cov-report=term-missing
