@@ -33,6 +33,7 @@ class CrawlTrapper(Trapper):
     """
 
     allowed_domains: list[str] = []
+    depth_limit: int | None = None
     deny_extensions: list[str] = [
         "pdf",
         "doc",
@@ -75,6 +76,10 @@ class CrawlTrapper(Trapper):
         async for item in self.parse_item(response):
             yield item
 
+        depth = response.request.meta.get("depth", 0) if response.request else 0
+        if self.depth_limit is not None and depth >= self.depth_limit:
+            return
+
         from chaser.net.request import Request
 
         for href in response.selector.css("a::attr(href)").getall():
@@ -85,7 +90,7 @@ class CrawlTrapper(Trapper):
             if not url.startswith(("http://", "https://")):
                 continue
             if self._is_allowed(url) and not self._has_denied_ext(url):
-                yield Request(url=url, meta={"trapper": self.name})
+                yield Request(url=url, meta={"trapper": self.name, "depth": depth + 1})
 
     async def parse_item(self, response: Response) -> AsyncIterator[ParseYield]:
         """Override to extract items from each crawled page."""

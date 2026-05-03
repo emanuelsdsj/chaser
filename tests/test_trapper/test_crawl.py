@@ -162,3 +162,74 @@ async def test_meta_carries_trapper_name() -> None:
     requests = [r for r in results if isinstance(r, Request)]
     for req in requests:
         assert req.meta.get("trapper") == "simple"
+
+
+# ---------------------------------------------------------------------------
+# Tests — depth_limit
+# ---------------------------------------------------------------------------
+
+
+def _response_at_depth(url: str, body: str, depth: int) -> Response:
+    req = Request(url=url, meta={"depth": depth})
+    return Response(
+        url=url,
+        status=200,
+        headers=Headers({"content-type": "text/html; charset=utf-8"}),
+        body=body.encode(),
+        request=req,
+    )
+
+
+@pytest.mark.asyncio
+async def test_depth_limit_stops_following_links() -> None:
+    class _LimitedCrawl(CrawlTrapper):
+        name = "limited"
+        start_urls = ["https://example.com"]
+        depth_limit = 1
+
+    resp = _response_at_depth("https://example.com/", _html("https://example.com/page"), depth=1)
+    results = [r async for r in _LimitedCrawl().parse(resp)]
+    requests = [r for r in results if isinstance(r, Request)]
+    assert requests == []
+
+
+@pytest.mark.asyncio
+async def test_depth_limit_none_follows_all() -> None:
+    resp = _response_at_depth(
+        "https://example.com/", _html("https://example.com/page"), depth=100
+    )
+    results = [r async for r in _SimpleCrawl().parse(resp)]
+    requests = [r for r in results if isinstance(r, Request)]
+    assert len(requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_depth_propagates_in_meta() -> None:
+    resp = _response_at_depth("https://example.com/", _html("https://example.com/p1"), depth=2)
+    results = [r async for r in _SimpleCrawl().parse(resp)]
+    requests = [r for r in results if isinstance(r, Request)]
+    assert len(requests) == 1
+    assert requests[0].meta["depth"] == 3
+
+
+@pytest.mark.asyncio
+async def test_depth_limit_items_still_yielded() -> None:
+    """Items are yielded even when depth limit is reached — only link following stops."""
+
+    class _LimitedItem(CrawlTrapper):
+        name = "limiteditem"
+        start_urls = ["https://example.com"]
+        depth_limit = 0
+
+        class Page(Item):
+            url: str
+
+        async def parse_item(self, response):  # type: ignore[override]
+            yield self.Page(url=response.url)
+
+    resp = _response_at_depth("https://example.com/", _html("https://example.com/p"), depth=0)
+    results = [r async for r in _LimitedItem().parse(resp)]
+    items = [r for r in results if isinstance(r, Item)]
+    requests = [r for r in results if isinstance(r, Request)]
+    assert len(items) == 1
+    assert requests == []
