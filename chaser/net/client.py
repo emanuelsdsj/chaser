@@ -175,10 +175,16 @@ class NetClient:
         breaker.record_success()
 
         encoding = raw.encoding or "utf-8"
+        seen: dict[str, list[str]] = {}
+        for k, v in raw.headers.multi_items():
+            seen.setdefault(k.lower(), []).append(v)
+        headers = Headers(
+            {k: "\n".join(vs) if k == "set-cookie" else vs[-1] for k, vs in seen.items()}
+        )
         response = Response(
             url=str(raw.url),
             status=raw.status_code,
-            headers=Headers(dict(raw.headers)),
+            headers=headers,
             body=raw.content,
             encoding=encoding,
             elapsed=elapsed,

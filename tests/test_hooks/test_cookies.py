@@ -51,3 +51,22 @@ class TestCookieJarHook:
         result = await hook.after_response(resp)
         assert result is resp
         assert not hook._jar
+
+    async def test_captures_multiple_set_cookie_headers(self) -> None:
+        # NetClient joins multiple Set-Cookie values with \n — verify all are stored
+        hook = CookieJarHook()
+        h = Headers()
+        h["set-cookie"] = "session=abc; path=/\ncsrf=tok123; path=/"
+        resp = Response(url="http://example.com/", status=200, headers=h, body=b"")
+        await hook.after_response(resp)
+        assert hook._jar["example.com"]["session"] == "abc"
+        assert hook._jar["example.com"]["csrf"] == "tok123"
+
+    async def test_empty_cookie_lines_ignored(self) -> None:
+        hook = CookieJarHook()
+        h = Headers()
+        h["set-cookie"] = "a=1\n\n  \nb=2"
+        resp = Response(url="http://example.com/", status=200, headers=h, body=b"")
+        await hook.after_response(resp)
+        assert hook._jar["example.com"]["a"] == "1"
+        assert hook._jar["example.com"]["b"] == "2"

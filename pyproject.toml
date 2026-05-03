@@ -70,7 +70,7 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
-ignore = ["B008", "UP007"]
+ignore = ["B008", "UP007", "B027"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["chaser"]

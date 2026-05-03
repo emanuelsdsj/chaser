@@ -17,9 +17,8 @@ class CookieJarHook(FetchHook):
     requests to the same domain. Works across redirect chains because the
     URL on the response is the final URL after redirects.
 
-    Note: because Headers stores one value per name, only the last Set-Cookie
-    header value is visible. Sites that set many cookies per response may need
-    a Headers upgrade to store multi-values — tracked separately.
+    Multiple Set-Cookie headers from the same response are joined with newlines
+    in NetClient and split back here, so all cookies are captured correctly.
     """
 
     def __init__(self) -> None:
@@ -45,10 +44,12 @@ class CookieJarHook(FetchHook):
         if not raw_header:
             return response
         domain = self._domain(response.url)
-        parsed: SimpleCookie[str] = SimpleCookie()
-        parsed.load(raw_header)
         async with self._lock:
             bucket = self._jar.setdefault(domain, {})
-            for key, morsel in parsed.items():
-                bucket[key] = morsel.value
+            for line in raw_header.split("\n"):
+                if line.strip():
+                    parsed: SimpleCookie[str] = SimpleCookie()
+                    parsed.load(line)
+                    for key, morsel in parsed.items():
+                        bucket[key] = morsel.value
         return response
