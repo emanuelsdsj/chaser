@@ -89,31 +89,41 @@ class Engine:
         pipeline_ctx = self._pipeline.run() if self._pipeline else nullcontext()
         browser_ctx: Any = self._make_browser_ctx() if self._use_browser else nullcontext()
 
-        async with (
-            browser_ctx as browser_client,
-            pipeline_ctx,
-            NetClient(**self._net_kwargs) as net,
-        ):
-            for trapper in trappers:
-                for req in trapper.start_requests():
-                    req.meta.setdefault("trapper", trapper.name)
-                    await self._frontier.push(req)
+        for trapper in trappers:
+            await trapper.open()
 
-            if self._frontier.empty():
-                logger.warning("No start requests found — nothing to crawl")
-                self.stats._mark_finished()
-                return self._items
+        try:
+            async with (
+                browser_ctx as browser_client,
+                pipeline_ctx,
+                NetClient(**self._net_kwargs) as net,
+            ):
+                for trapper in trappers:
+                    for req in trapper.start_requests():
+                        req.meta.setdefault("trapper", trapper.name)
+                        await self._frontier.push(req)
 
-            workers = [
-                asyncio.create_task(self._worker(net, browser_client, trapper_map))
-                for _ in range(self._concurrency)
-            ]
+                if self._frontier.empty():
+                    logger.warning("No start requests found — nothing to crawl")
+                    self.stats._mark_finished()
+                    return self._items
 
-            await self._frontier.join()
+                workers = [
+                    asyncio.create_task(self._worker(net, browser_client, trapper_map))
+                    for _ in range(self._concurrency)
+                ]
 
-            for w in workers:
-                w.cancel()
-            await asyncio.gather(*workers, return_exceptions=True)
+                await self._frontier.join()
+
+                for w in workers:
+                    w.cancel()
+                await asyncio.gather(*workers, return_exceptions=True)
+        finally:
+            for trapper in reversed(list(trappers)):
+                try:
+                    await trapper.close()
+                except Exception:
+                    logger.exception("Error closing trapper %r", trapper.name)
 
         self.stats._mark_finished()
         return self._items

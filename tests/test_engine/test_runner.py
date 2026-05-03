@@ -177,6 +177,78 @@ class TestEngineRun:
         assert len(items) == 3
 
 
+class TestTrapperLifecycle:
+    @respx.mock
+    async def test_open_called_before_parse(self) -> None:
+        call_order: list[str] = []
+        respx.get("http://example.com/").mock(return_value=httpx.Response(200, content=b""))
+
+        class _LifecycleTrpper(_SimpleTrpper):
+            name = "lifecycle"
+
+            async def open(self) -> None:
+                call_order.append("open")
+
+            async def parse(self, response: Response):  # type: ignore[override]
+                call_order.append("parse")
+                yield _PageItem(url=response.url, status=response.status)
+
+        engine = Engine(concurrency=1, http2=False)
+        await engine.run(_LifecycleTrpper(["http://example.com/"]))
+        assert call_order[0] == "open"
+        assert "parse" in call_order
+
+    @respx.mock
+    async def test_close_called_after_crawl(self) -> None:
+        closed: list[bool] = []
+        respx.get("http://example.com/").mock(return_value=httpx.Response(200, content=b""))
+
+        class _CloseTrpper(_SimpleTrpper):
+            name = "close"
+
+            async def close(self) -> None:
+                closed.append(True)
+
+        engine = Engine(concurrency=1, http2=False)
+        await engine.run(_CloseTrpper(["http://example.com/"]))
+        assert closed == [True]
+
+    async def test_close_called_even_on_empty_frontier(self) -> None:
+        closed: list[bool] = []
+
+        class _EmptyClose(_SimpleTrpper):
+            name = "emptyclose"
+
+            async def close(self) -> None:
+                closed.append(True)
+
+        engine = Engine(concurrency=1, http2=False)
+        await engine.run(_EmptyClose([]))  # no start URLs → early return
+        assert closed == [True]
+
+    @respx.mock
+    async def test_close_exception_does_not_block_other_closes(self) -> None:
+        closed_b: list[bool] = []
+        respx.get("http://example.com/").mock(return_value=httpx.Response(200, content=b""))
+
+        class _TrapperA(_SimpleTrpper):
+            name = "ta"
+
+            async def close(self) -> None:
+                raise RuntimeError("close failed")
+
+        class _TrapperB(_SimpleTrpper):
+            name = "tb"
+
+            async def close(self) -> None:
+                closed_b.append(True)
+
+        engine = Engine(concurrency=1, http2=False)
+        # should not raise despite _TrapperA.close() failing
+        await engine.run([_TrapperA(["http://example.com/"]), _TrapperB([])])
+        assert closed_b == [True]
+
+
 class TestTrapperBase:
     def test_name_auto_derived_from_class(self) -> None:
         class MyFancyTrpper(Trapper):

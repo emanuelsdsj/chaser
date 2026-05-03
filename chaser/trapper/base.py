@@ -31,6 +31,12 @@ class Trapper(ABC):
         if not cls.__dict__.get("name"):
             cls.name = cls.__name__.lower()
 
+    async def open(self) -> None:
+        """Called once before the crawl starts. Override for setup (DB connections, login, etc.)."""
+
+    async def close(self) -> None:
+        """Called once after the crawl finishes. Override for teardown."""
+
     def start_requests(self) -> list[Any]:
         """Produce initial requests from ``start_urls``.
 
