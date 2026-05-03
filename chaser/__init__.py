@@ -3,6 +3,7 @@
 from chaser.browser.client import BrowserClient
 from chaser.engine.runner import Engine
 from chaser.engine.stats import CrawlStats
+from chaser.hooks.autothrottle import AutoThrottleHook
 from chaser.hooks.cookies import CookieJarHook
 from chaser.hooks.proxy import ProxyPool
 from chaser.hooks.ratelimit import RateLimitHook
@@ -45,6 +46,7 @@ __all__ = [
     "RateLimitHook",
     "CookieJarHook",
     "RobotsHook",
+    "AutoThrottleHook",
     "BrowserClient",
     "__version__",
 ]
