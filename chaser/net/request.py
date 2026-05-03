@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlencode
 
 from chaser.net.headers import Headers
 
@@ -22,6 +23,30 @@ class Request:
         self.method = self.method.upper()
         if not isinstance(self.headers, Headers):
             self.headers = Headers(self.headers)  # type: ignore[arg-type]
+
+    @classmethod
+    def from_form(
+        cls,
+        url: str,
+        data: dict[str, str],
+        *,
+        method: str = "POST",
+        headers: dict[str, str] | None = None,
+        **kwargs: Any,
+    ) -> Request:
+        """Build a form POST request (application/x-www-form-urlencoded).
+
+        Multipart/form-data is not supported yet — use ``body`` directly for that.
+        """
+        merged = {"content-type": "application/x-www-form-urlencoded"}
+        merged.update(headers or {})
+        return cls(
+            url=url,
+            method=method,
+            body=urlencode(data).encode("utf-8"),
+            headers=Headers(merged),
+            **kwargs,
+        )
 
     def copy(self, **overrides: Any) -> Request:
         return dataclasses.replace(self, **overrides)

@@ -75,3 +75,41 @@ def test_repr():
     r = Request(url="https://example.com/page", method="GET")
     assert "GET" in repr(r)
     assert "example.com" in repr(r)
+
+
+# ---------------------------------------------------------------------------
+# from_form
+# ---------------------------------------------------------------------------
+
+
+def test_from_form_encodes_body():
+    r = Request.from_form("https://example.com/login", {"user": "alice", "pass": "secret"})
+    assert r.body is not None
+    body_str = r.body.decode()
+    assert "user=alice" in body_str
+    assert "pass=secret" in body_str
+
+
+def test_from_form_sets_content_type():
+    r = Request.from_form("https://example.com/submit", {"q": "hello"})
+    assert r.headers.get("content-type") == "application/x-www-form-urlencoded"
+
+
+def test_from_form_default_method_is_post():
+    r = Request.from_form("https://example.com/", {"x": "1"})
+    assert r.method == "POST"
+
+
+def test_from_form_custom_headers_preserved():
+    r = Request.from_form(
+        "https://example.com/",
+        {"x": "1"},
+        headers={"x-csrf-token": "abc123"},
+    )
+    assert r.headers.get("x-csrf-token") == "abc123"
+    assert r.headers.get("content-type") == "application/x-www-form-urlencoded"
+
+
+def test_from_form_custom_method():
+    r = Request.from_form("https://example.com/", {"x": "1"}, method="PUT")
+    assert r.method == "PUT"
