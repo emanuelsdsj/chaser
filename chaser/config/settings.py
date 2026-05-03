@@ -2,8 +2,15 @@ from __future__ import annotations
 
 import logging
 import tomllib  # stdlib on Python 3.11+
+from importlib.metadata import PackageNotFoundError as _PNF
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
 from typing import Any
+
+try:
+    _chaser_version = _pkg_version("chaser")
+except _PNF:
+    _chaser_version = "dev"
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
@@ -90,7 +97,7 @@ class ChaserSettings(BaseSettings):
     max_connections: int = Field(default=100, ge=1)
     proxy: str | None = None
     log_level: str = Field(default="WARNING", pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$")
-    user_agent: str = "chaser/0.0.1"
+    user_agent: str = f"chaser/{_chaser_version}"
 
     @classmethod
     def settings_customise_sources(
