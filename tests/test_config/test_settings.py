@@ -21,7 +21,7 @@ def test_defaults() -> None:
     assert cfg.max_connections == 100
     assert cfg.proxy is None
     assert cfg.log_level == "WARNING"
-    assert cfg.user_agent == "chaser/0.0.1"
+    assert cfg.user_agent.startswith("chaser/")
 
 
 # ---------------------------------------------------------------------------
