@@ -11,7 +11,7 @@ from chaser.engine.stats import CrawlStats
 from chaser.frontier.queue import Frontier
 from chaser.hooks.base import RequestAborted
 from chaser.item.base import Item
-from chaser.net.client import CircuitOpenError, FetchError, NetClient
+from chaser.net.client import CircuitOpenError, FetchError, NetClient, TimeoutFetchError
 from chaser.net.request import Request
 from chaser.trapper.base import Trapper
 
@@ -191,6 +191,9 @@ class Engine:
         if response is None:
             return
 
+        if response.status >= 400:
+            self.stats._record_status_error(response.status)
+
         if trapper is None:
             logger.warning(
                 "No trapper %r registered for %s — dropping response",
@@ -232,6 +235,15 @@ class Engine:
                 logger.debug("Request aborted by hook — %s: %s", request.url, exc)
                 self.stats.requests_failed += 1
                 return None
+            except TimeoutFetchError as exc:
+                if self._retry and self._retry.should_retry(attempt, exc):
+                    await self._retry.wait(attempt)
+                    attempt += 1
+                else:
+                    logger.warning("Fetch timed out — %s: %s", request.url, exc)
+                    self.stats.timeouts += 1
+                    self.stats.requests_failed += 1
+                    return None
             except FetchError as exc:
                 if self._retry and self._retry.should_retry(attempt, exc):
                     await self._retry.wait(attempt)

@@ -172,3 +172,71 @@ async def test_stats_empty_crawl_marks_finish() -> None:
 
     assert engine.stats.elapsed >= 0
     assert engine.stats._finish is not None
+
+
+# ---------------------------------------------------------------------------
+# Detailed error stats
+# ---------------------------------------------------------------------------
+
+
+def test_stats_timeouts_default_zero() -> None:
+    s = CrawlStats()
+    assert s.timeouts == 0
+    assert s.errors_by_status == {}
+
+
+def test_record_status_error_accumulates() -> None:
+    s = CrawlStats()
+    s._record_status_error(404)
+    s._record_status_error(404)
+    s._record_status_error(500)
+    assert s.errors_by_status == {404: 2, 500: 1}
+
+
+def test_repr_shows_timeouts_and_errors() -> None:
+    s = CrawlStats(timeouts=3)
+    s._record_status_error(404)
+    r = repr(s)
+    assert "timeouts=3" in r
+    assert "errors_by_status" in r
+
+
+@respx.mock
+async def test_stats_errors_by_status_on_4xx() -> None:
+    respx.get("http://example.com/missing").mock(return_value=httpx.Response(404, content=b"nope"))
+
+    engine = Engine(concurrency=1, http2=False)
+    await engine.run(_NoItemTrpper(["http://example.com/missing"]))
+
+    assert engine.stats.errors_by_status.get(404) == 1
+
+
+@respx.mock
+async def test_stats_errors_by_status_on_5xx() -> None:
+    respx.get("http://example.com/crash").mock(return_value=httpx.Response(500, content=b"oops"))
+
+    engine = Engine(concurrency=1, http2=False)
+    await engine.run(_NoItemTrpper(["http://example.com/crash"]))
+
+    assert engine.stats.errors_by_status.get(500) == 1
+
+
+@respx.mock
+async def test_stats_errors_by_status_not_set_on_2xx() -> None:
+    respx.get("http://example.com/").mock(return_value=httpx.Response(200, content=b"ok"))
+
+    engine = Engine(concurrency=1, http2=False)
+    await engine.run(_NoItemTrpper(["http://example.com/"]))
+
+    assert engine.stats.errors_by_status == {}
+
+
+@respx.mock
+async def test_stats_timeouts_incremented() -> None:
+    respx.get("http://slow.com/").mock(side_effect=httpx.ReadTimeout("timed out"))
+
+    engine = Engine(concurrency=1, http2=False)
+    await engine.run(_NoItemTrpper(["http://slow.com/"]))
+
+    assert engine.stats.timeouts == 1
+    assert engine.stats.requests_failed == 1

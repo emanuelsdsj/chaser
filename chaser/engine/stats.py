@@ -24,11 +24,16 @@ class CrawlStats:
     requests_failed: int = 0
     items_scraped: int = 0
     bytes_downloaded: int = 0
+    timeouts: int = 0
+    errors_by_status: dict[int, int] = field(default_factory=dict)
     _start: float = field(default_factory=time.monotonic, repr=False)
     _finish: float | None = field(default=None, repr=False)
 
     def _mark_finished(self) -> None:
         self._finish = time.monotonic()
+
+    def _record_status_error(self, status: int) -> None:
+        self.errors_by_status[status] = self.errors_by_status.get(status, 0) + 1
 
     @property
     def elapsed(self) -> float:
@@ -46,6 +51,8 @@ class CrawlStats:
             f"requests_sent={self.requests_sent}, "
             f"requests_ok={self.requests_ok}, "
             f"requests_failed={self.requests_failed}, "
+            f"timeouts={self.timeouts}, "
+            f"errors_by_status={self.errors_by_status}, "
             f"items_scraped={self.items_scraped}, "
             f"bytes_downloaded={self.bytes_downloaded}, "
             f"elapsed={self.elapsed:.2f}s)"
