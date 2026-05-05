@@ -41,6 +41,46 @@ class Response:
         """Resolve *url* relative to this response's URL."""
         return _urljoin(self.url, url)
 
+    def follow(
+        self,
+        url: str,
+        *,
+        callback: str | None = None,
+        meta: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> Request:
+        """Build a Request from *url* resolved relative to this response.
+
+        Saves the urljoin + Request() boilerplate in parse methods.
+        """
+        from chaser.net.request import Request
+
+        return Request(
+            url=self.urljoin(url),
+            callback=callback,
+            meta=dict(meta) if meta else {},
+            **kwargs,
+        )
+
+    def follow_all(
+        self,
+        css: str,
+        *,
+        callback: str | None = None,
+        meta: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> list[Request]:
+        """Follow all URLs extracted by *css* selector (e.g. ``a::attr(href)``).
+
+        Empty and whitespace-only values are skipped. Each URL is resolved
+        relative to this response before building the Request.
+        """
+        return [
+            self.follow(href, callback=callback, meta=dict(meta) if meta else {}, **kwargs)
+            for href in self.selector.css(css).getall()
+            if href.strip()
+        ]
+
     @property
     def selector(self) -> Selector:
         from chaser.extract.selector import Selector

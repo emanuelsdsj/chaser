@@ -123,3 +123,89 @@ def test_json_selector_jmespath_no_match():
 
     r = resp(body=json.dumps({"a": 1}).encode())
     assert r.json_selector.jmespath("missing.key").getall() == []
+
+
+# ---------------------------------------------------------------------------
+# follow / follow_all
+# ---------------------------------------------------------------------------
+
+
+def _html_links(*hrefs: str) -> bytes:
+    links = "".join(f'<a href="{h}">link</a>' for h in hrefs)
+    return f"<html><body>{links}</body></html>".encode()
+
+
+def test_follow_absolute_url():
+    from chaser.net.request import Request
+
+    r = resp(url="https://example.com/page")
+    req = r.follow("https://other.com/about")
+    assert isinstance(req, Request)
+    assert req.url == "https://other.com/about"
+
+
+def test_follow_relative_path():
+    from chaser.net.request import Request
+
+    r = resp(url="https://example.com/blog/")
+    req = r.follow("post-1")
+    assert isinstance(req, Request)
+    assert req.url == "https://example.com/blog/post-1"
+
+
+def test_follow_absolute_path():
+    r = resp(url="https://example.com/blog/post")
+    req = r.follow("/about")
+    assert req.url == "https://example.com/about"
+
+
+def test_follow_forwards_callback_and_meta():
+    from chaser.net.request import Request
+
+    r = resp(url="https://example.com/")
+    req = r.follow("/page", callback="parse_page", meta={"depth": 2})
+    assert req.callback == "parse_page"
+    assert req.meta["depth"] == 2
+
+
+def test_follow_meta_is_copied():
+    r = resp(url="https://example.com/")
+    src = {"key": "val"}
+    req = r.follow("/page", meta=src)
+    req.meta["key"] = "changed"
+    assert src["key"] == "val"
+
+
+def test_follow_all_returns_requests():
+    from chaser.net.request import Request
+
+    r = resp(url="https://example.com/", body=_html_links("/a", "/b", "/c"))
+    requests = r.follow_all("a::attr(href)")
+    assert len(requests) == 3
+    assert all(isinstance(req, Request) for req in requests)
+
+
+def test_follow_all_resolves_relative_urls():
+    r = resp(url="https://example.com/", body=_html_links("/about", "blog/"))
+    requests = r.follow_all("a::attr(href)")
+    urls = [req.url for req in requests]
+    assert "https://example.com/about" in urls
+    assert "https://example.com/blog/" in urls
+
+
+def test_follow_all_skips_empty():
+    r = resp(url="https://example.com/", body=_html_links("", "  ", "/valid"))
+    requests = r.follow_all("a::attr(href)")
+    assert len(requests) == 1
+    assert requests[0].url == "https://example.com/valid"
+
+
+def test_follow_all_no_matches_returns_empty():
+    r = resp(url="https://example.com/", body=b"<html><p>no links</p></html>")
+    assert r.follow_all("a::attr(href)") == []
+
+
+def test_follow_all_forwards_meta():
+    r = resp(url="https://example.com/", body=_html_links("/p"))
+    requests = r.follow_all("a::attr(href)", meta={"section": "blog"})
+    assert requests[0].meta["section"] == "blog"
