@@ -72,7 +72,11 @@ class CircuitOpenError(Exception):
 
 
 class FetchError(Exception):
-    """Transport-level failure (connection refused, timeout, etc.)."""
+    """Transport-level failure (connection refused, etc.)."""
+
+
+class TimeoutFetchError(FetchError):
+    """Request timed out before the server responded."""
 
 
 class NetClient:
@@ -159,6 +163,8 @@ class NetClient:
         if breaker.is_open():
             raise CircuitOpenError(f"Circuit open for {host!r} — request skipped")
 
+        timeout = request.meta.get("timeout", self._timeout)
+
         t0 = time.monotonic()
         try:
             raw = await self._client.request(
@@ -166,7 +172,11 @@ class NetClient:
                 url=request.url,
                 headers=dict(request.headers),
                 content=request.body,
+                timeout=timeout,
             )
+        except httpx.TimeoutException as exc:
+            breaker.record_failure()
+            raise TimeoutFetchError(str(exc)) from exc
         except httpx.TransportError as exc:
             breaker.record_failure()
             raise FetchError(str(exc)) from exc

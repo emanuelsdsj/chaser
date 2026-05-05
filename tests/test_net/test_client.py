@@ -236,3 +236,58 @@ class TestNetClientCircuitBreaker:
             resp = await client.fetch(Request("http://recovering.com/"))
             assert resp.status == 200
             assert not breaker.is_open()
+
+
+class TestPerRequestTimeout:
+    @pytest.mark.asyncio
+    async def test_timeout_fetch_error_is_fetch_error(self) -> None:
+        from chaser.net.client import FetchError, TimeoutFetchError
+
+        assert issubclass(TimeoutFetchError, FetchError)
+
+    @pytest.mark.asyncio
+    async def test_timeout_exception_raises_timeout_fetch_error(self) -> None:
+        from chaser.net.client import TimeoutFetchError
+
+        async def _timeout(*args, **kwargs):  # type: ignore[override]
+            raise httpx.ReadTimeout("timed out", request=None)
+
+        async with NetClient(http2=False) as client:
+            with patch.object(client._client, "request", _timeout):
+                with pytest.raises(TimeoutFetchError):
+                    await client.fetch(Request("http://slow.com/"))
+
+    @pytest.mark.asyncio
+    async def test_meta_timeout_passed_to_httpx(self) -> None:
+        """meta['timeout'] must override the client-level default."""
+        captured: list[object] = []
+        _httpx_req = httpx.Request("GET", "http://example.com/")
+
+        async def _spy(*args, **kwargs):  # type: ignore[override]
+            captured.append(kwargs.get("timeout"))
+            r = httpx.Response(200, content=b"ok")
+            r.request = _httpx_req
+            return r
+
+        async with NetClient(http2=False, timeout=30.0) as client:
+            with patch.object(client._client, "request", _spy):
+                await client.fetch(Request("http://example.com/", meta={"timeout": 5.0}))
+
+        assert captured == [5.0]
+
+    @pytest.mark.asyncio
+    async def test_default_timeout_used_without_meta(self) -> None:
+        captured: list[object] = []
+        _httpx_req = httpx.Request("GET", "http://example.com/")
+
+        async def _spy(*args, **kwargs):  # type: ignore[override]
+            captured.append(kwargs.get("timeout"))
+            r = httpx.Response(200, content=b"ok")
+            r.request = _httpx_req
+            return r
+
+        async with NetClient(http2=False, timeout=42.0) as client:
+            with patch.object(client._client, "request", _spy):
+                await client.fetch(Request("http://example.com/"))
+
+        assert captured == [42.0]
