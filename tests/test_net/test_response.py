@@ -160,7 +160,6 @@ def test_follow_absolute_path():
 
 
 def test_follow_forwards_callback_and_meta():
-    from chaser.net.request import Request
 
     r = resp(url="https://example.com/")
     req = r.follow("/page", callback="parse_page", meta={"depth": 2})

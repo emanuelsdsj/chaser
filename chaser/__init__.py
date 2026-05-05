@@ -20,7 +20,7 @@ from chaser.trapper.base import Trapper
 from chaser.trapper.crawl import CrawlTrapper
 from chaser.trapper.sitemap import SitemapTrapper
 
-__version__ = "0.0.1"
+__version__ = "0.1.0"
 
 __all__ = [
     "Engine",
