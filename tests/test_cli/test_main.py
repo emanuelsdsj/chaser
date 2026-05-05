@@ -121,3 +121,59 @@ def test_shell_fetches_and_exits(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # exit code may vary — just verify no unhandled crash
     assert result.exit_code in (0, 1)
+
+
+# ---------------------------------------------------------------------------
+# --log-level / --json-logs
+# ---------------------------------------------------------------------------
+
+
+def test_setup_logging_sets_level() -> None:
+    import logging
+
+    from chaser.cli.main import _setup_logging
+
+    _setup_logging("debug", json_logs=False)
+    assert logging.getLogger().level == logging.DEBUG
+
+
+def test_setup_logging_json_formatter() -> None:
+    import json
+    import logging
+
+    from chaser.cli.main import _JsonFormatter, _setup_logging
+
+    _setup_logging("info", json_logs=True)
+    root = logging.getLogger()
+    handlers = [h for h in root.handlers if isinstance(h.formatter, _JsonFormatter)]
+    assert handlers, "no JSON formatter attached"
+
+    record = logging.LogRecord("test", logging.INFO, "", 0, "hello json", (), None)
+    payload = json.loads(handlers[0].formatter.format(record))
+    assert payload["level"] == "INFO"
+    assert payload["msg"] == "hello json"
+    assert "ts" in payload
+
+
+def test_run_accepts_log_level_option() -> None:
+    from unittest.mock import AsyncMock, patch
+
+    items: list = []
+    with patch("chaser.engine.runner.Engine.run", new=AsyncMock(return_value=items)):
+        result = runner.invoke(
+            app,
+            ["run", "tests.test_cli.test_main:_FakeTrapper", "--log-level", "debug"],
+        )
+    assert result.exit_code == 0
+
+
+def test_run_accepts_json_logs_flag() -> None:
+    from unittest.mock import AsyncMock, patch
+
+    items: list = []
+    with patch("chaser.engine.runner.Engine.run", new=AsyncMock(return_value=items)):
+        result = runner.invoke(
+            app,
+            ["run", "tests.test_cli.test_main:_FakeTrapper", "--json-logs"],
+        )
+    assert result.exit_code == 0

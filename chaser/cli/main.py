@@ -3,11 +3,38 @@ from __future__ import annotations
 import asyncio
 import code
 import importlib
+import json
+import logging
+import sys
 from typing import Annotated, Any
 
 import typer
 
 from chaser import __version__
+
+
+class _JsonFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "ts": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "logger": record.name,
+            "msg": record.getMessage(),
+        }
+        if record.exc_info:
+            payload["exc"] = self.formatException(record.exc_info)
+        return json.dumps(payload)
+
+
+def _setup_logging(level: str, json_logs: bool) -> None:
+    numeric = getattr(logging, level.upper(), logging.WARNING)
+    handler = logging.StreamHandler(sys.stderr)
+    fmt: logging.Formatter = (
+        _JsonFormatter() if json_logs else logging.Formatter("%(levelname)s %(name)s %(message)s")
+    )
+    handler.setFormatter(fmt)
+    logging.basicConfig(level=numeric, handlers=[handler], force=True)
+
 
 app = typer.Typer(
     name="chaser",
@@ -61,8 +88,15 @@ def run(
     timeout: Annotated[float, typer.Option(help="Request timeout in seconds")] = 30.0,
     proxy: Annotated[str | None, typer.Option(help="Proxy URL (http or socks5)")] = None,
     no_http2: Annotated[bool, typer.Option("--no-http2", help="Disable HTTP/2")] = False,
+    log_level: Annotated[
+        str, typer.Option("--log-level", help="Logging level: debug|info|warning|error")
+    ] = "warning",
+    json_logs: Annotated[
+        bool, typer.Option("--json-logs", help="Emit logs as JSON objects")
+    ] = False,
 ) -> None:
     """Run a Trapper and print collected items to stdout."""
+    _setup_logging(log_level, json_logs)
     from chaser.engine.runner import Engine
 
     cls = _import_trapper(trapper)
