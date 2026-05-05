@@ -169,6 +169,111 @@ def shell(
         code.interact(local=local_vars, banner="")
 
 
+@app.command()
+def new(
+    name: Annotated[str, typer.Argument(help="Project name (used for directory and package)")],
+    output_dir: Annotated[
+        str, typer.Option("--output-dir", "-o", help="Where to create the project (default: .)")
+    ] = ".",
+) -> None:
+    """Scaffold a new Chaser project.
+
+    Creates a ready-to-run project with a sample Trapper, tests, and
+    pyproject.toml pre-configured with chaser as a dependency.
+    """
+    import os
+    import re
+
+    pkg = re.sub(r"[^a-z0-9_]", "_", name.lower())
+    root = os.path.join(output_dir, name)
+
+    if os.path.exists(root):
+        typer.echo(f"Error: directory {root!r} already exists", err=True)
+        raise typer.Exit(1)
+
+    files: dict[str, str] = {
+        "pyproject.toml": f"""\
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "{name}"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["chaser"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+""",
+        f"{pkg}/__init__.py": "",
+        f"{pkg}/trappers.py": f"""\
+from __future__ import annotations
+
+from collections.abc import AsyncIterator
+
+from chaser import CrawlTrapper, Item
+from chaser.net.response import Response
+
+
+class PageItem(Item):
+    url: str
+    title: str
+
+
+class {pkg.title().replace("_", "")}Trapper(CrawlTrapper):
+    name = "{pkg}"
+    start_urls = ["https://example.com"]
+    allowed_domains = ["example.com"]
+
+    async def parse_item(self, response: Response) -> AsyncIterator[PageItem]:
+        title = response.selector.css("title::text").get("").strip()
+        yield PageItem(url=response.url, title=title)
+""",
+        "tests/__init__.py": "",
+        "tests/test_trappers.py": f"""\
+from __future__ import annotations
+
+import pytest
+
+from chaser.testing import FakeResponse, assert_items
+from {pkg}.trappers import {pkg.title().replace("_", "")}Trapper
+
+
+@pytest.mark.asyncio
+async def test_parse_extracts_title() -> None:
+    response = FakeResponse(
+        "https://example.com",
+        "<html><head><title>Hello World</title></head></html>",
+    )
+    await assert_items(
+        {pkg.title().replace("_", "")}Trapper(),
+        response,
+        [{{"url": "https://example.com", "title": "Hello World"}}],
+    )
+""",
+        ".gitignore": """\
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+*.egg-info/
+.pytest_cache/
+""",
+    }
+
+    for rel_path, content in files.items():
+        full_path = os.path.join(root, rel_path)
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, "w", encoding="utf-8") as fh:
+            fh.write(content)
+
+    typer.echo(f"Created project {name!r} in {root}/")
+    typer.echo(f"  cd {name}")
+    typer.echo("  pip install -e '.[dev]'")
+    typer.echo(f"  chaser run {pkg}.trappers:{pkg.title().replace('_', '')}Trapper")
+
+
 def main() -> None:
     app()
 

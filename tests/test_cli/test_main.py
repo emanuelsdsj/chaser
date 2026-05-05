@@ -177,3 +177,60 @@ def test_run_accepts_json_logs_flag() -> None:
             ["run", "tests.test_cli.test_main:_FakeTrapper", "--json-logs"],
         )
     assert result.exit_code == 0
+
+
+# ---------------------------------------------------------------------------
+# chaser new
+# ---------------------------------------------------------------------------
+
+
+def test_new_creates_directory(tmp_path) -> None:
+    result = runner.invoke(app, ["new", "my-project", "--output-dir", str(tmp_path)])
+    assert result.exit_code == 0
+    assert (tmp_path / "my-project").is_dir()
+
+
+def test_new_creates_package_and_trapper(tmp_path) -> None:
+    runner.invoke(app, ["new", "my-project", "--output-dir", str(tmp_path)])
+    root = tmp_path / "my-project"
+    assert (root / "my_project" / "trappers.py").exists()
+    assert (root / "my_project" / "__init__.py").exists()
+
+
+def test_new_creates_test_file(tmp_path) -> None:
+    runner.invoke(app, ["new", "my-project", "--output-dir", str(tmp_path)])
+    assert (tmp_path / "my-project" / "tests" / "test_trappers.py").exists()
+
+
+def test_new_creates_pyproject_toml(tmp_path) -> None:
+    runner.invoke(app, ["new", "my-project", "--output-dir", str(tmp_path)])
+    pyproject = (tmp_path / "my-project" / "pyproject.toml").read_text()
+    assert "chaser" in pyproject
+    assert 'name = "my-project"' in pyproject
+
+
+def test_new_creates_gitignore(tmp_path) -> None:
+    runner.invoke(app, ["new", "my-project", "--output-dir", str(tmp_path)])
+    assert (tmp_path / "my-project" / ".gitignore").exists()
+
+
+def test_new_sanitizes_hyphenated_name(tmp_path) -> None:
+    runner.invoke(app, ["new", "my-cool-scraper", "--output-dir", str(tmp_path)])
+    root = tmp_path / "my-cool-scraper"
+    assert (root / "my_cool_scraper" / "trappers.py").exists()
+    content = (root / "my_cool_scraper" / "trappers.py").read_text()
+    assert "MyCoolScraperTrapper" in content
+
+
+def test_new_fails_if_directory_exists(tmp_path) -> None:
+    runner.invoke(app, ["new", "myproject", "--output-dir", str(tmp_path)])
+    result = runner.invoke(app, ["new", "myproject", "--output-dir", str(tmp_path)])
+    assert result.exit_code != 0
+
+
+def test_new_generated_test_uses_testing_module(tmp_path) -> None:
+    runner.invoke(app, ["new", "myproject", "--output-dir", str(tmp_path)])
+    test_content = (tmp_path / "myproject" / "tests" / "test_trappers.py").read_text()
+    assert "from chaser.testing import" in test_content
+    assert "FakeResponse" in test_content
+    assert "assert_items" in test_content
