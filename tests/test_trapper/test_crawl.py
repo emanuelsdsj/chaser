@@ -231,3 +231,102 @@ async def test_depth_limit_items_still_yielded() -> None:
     requests = [r for r in results if isinstance(r, Request)]
     assert len(items) == 1
     assert requests == []
+
+
+# ---------------------------------------------------------------------------
+# Tests — allow_patterns / deny_patterns
+# ---------------------------------------------------------------------------
+
+
+class _PatternCrawl(CrawlTrapper):
+    name = "pattern"
+    start_urls = ["https://example.com"]
+
+
+@pytest.mark.asyncio
+async def test_allow_patterns_filters_non_matching() -> None:
+    class _Crawl(_PatternCrawl):
+        allow_patterns = [r"/blog/"]
+
+    resp = _response(
+        "https://example.com/",
+        _html("https://example.com/blog/post-1", "https://example.com/shop/item"),
+    )
+    results = [r async for r in _Crawl().parse(resp)]
+    urls = {r.url for r in results if isinstance(r, Request)}
+    assert "https://example.com/blog/post-1" in urls
+    assert "https://example.com/shop/item" not in urls
+
+
+@pytest.mark.asyncio
+async def test_allow_patterns_empty_allows_all() -> None:
+    class _Crawl(_PatternCrawl):
+        allow_patterns = []
+
+    resp = _response(
+        "https://example.com/",
+        _html("https://example.com/anything", "https://example.com/other"),
+    )
+    results = [r async for r in _Crawl().parse(resp)]
+    urls = {r.url for r in results if isinstance(r, Request)}
+    assert len(urls) == 2
+
+
+@pytest.mark.asyncio
+async def test_deny_patterns_blocks_matching() -> None:
+    class _Crawl(_PatternCrawl):
+        deny_patterns = [r"\?page=\d+"]
+
+    resp = _response(
+        "https://example.com/",
+        _html(
+            "https://example.com/about",
+            "https://example.com/list?page=2",
+        ),
+    )
+    results = [r async for r in _Crawl().parse(resp)]
+    urls = {r.url for r in results if isinstance(r, Request)}
+    assert "https://example.com/about" in urls
+    assert "https://example.com/list?page=2" not in urls
+
+
+@pytest.mark.asyncio
+async def test_allow_and_deny_patterns_combined() -> None:
+    class _Crawl(_PatternCrawl):
+        allow_patterns = [r"/product/"]
+        deny_patterns = [r"/product/sale"]
+
+    resp = _response(
+        "https://example.com/",
+        _html(
+            "https://example.com/product/widget",
+            "https://example.com/product/sale-item",
+            "https://example.com/about",
+        ),
+    )
+    results = [r async for r in _Crawl().parse(resp)]
+    urls = {r.url for r in results if isinstance(r, Request)}
+    assert "https://example.com/product/widget" in urls
+    assert "https://example.com/product/sale-item" not in urls
+    assert "https://example.com/about" not in urls
+
+
+@pytest.mark.asyncio
+async def test_allow_patterns_with_allowed_domains() -> None:
+    class _Crawl(_PatternCrawl):
+        allowed_domains = ["example.com"]
+        allow_patterns = [r"/news/"]
+
+    resp = _response(
+        "https://example.com/",
+        _html(
+            "https://example.com/news/today",
+            "https://example.com/shop",
+            "https://other.com/news/today",
+        ),
+    )
+    results = [r async for r in _Crawl().parse(resp)]
+    urls = {r.url for r in results if isinstance(r, Request)}
+    assert "https://example.com/news/today" in urls
+    assert "https://example.com/shop" not in urls
+    assert "https://other.com/news/today" not in urls

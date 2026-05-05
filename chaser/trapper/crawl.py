@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin, urlparse
@@ -33,6 +34,8 @@ class CrawlTrapper(Trapper):
     """
 
     allowed_domains: list[str] = []
+    allow_patterns: list[str] = []
+    deny_patterns: list[str] = []
     depth_limit: int | None = None
     deny_extensions: list[str] = [
         "pdf",
@@ -63,10 +66,13 @@ class CrawlTrapper(Trapper):
     ]
 
     def _is_allowed(self, url: str) -> bool:
-        if not self.allowed_domains:
-            return True
-        host = urlparse(url).netloc
-        return any(host == domain or host.endswith("." + domain) for domain in self.allowed_domains)
+        if self.allowed_domains:
+            host = urlparse(url).netloc
+            if not any(host == d or host.endswith("." + d) for d in self.allowed_domains):
+                return False
+        if self.allow_patterns and not any(re.search(p, url) for p in self.allow_patterns):
+            return False
+        return not (self.deny_patterns and any(re.search(p, url) for p in self.deny_patterns))
 
     def _has_denied_ext(self, url: str) -> bool:
         path = urlparse(url).path.lower().split("?")[0]
