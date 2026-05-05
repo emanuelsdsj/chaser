@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from chaser.frontier.queue import BloomFilter, Frontier
+from chaser.frontier.queue import BloomFilter, Frontier, canonicalize
 from chaser.net.request import Request
 
 # ---------------------------------------------------------------------------
@@ -190,3 +190,66 @@ class TestFrontierState:
         await f.pop()
         f.task_done()
         await f.join()  # should not block
+
+
+# ---------------------------------------------------------------------------
+# URL canonicalization
+# ---------------------------------------------------------------------------
+
+
+class TestCanonicalize:
+    def test_strips_fragment(self):
+        assert canonicalize("https://example.com/page#section") == "https://example.com/page"
+
+    def test_no_fragment_unchanged(self):
+        assert canonicalize("https://example.com/page") == "https://example.com/page"
+
+    def test_empty_fragment_stripped(self):
+        assert canonicalize("https://example.com/page#") == "https://example.com/page"
+
+    def test_sort_params_off_by_default(self):
+        url = "https://example.com/?b=2&a=1"
+        assert canonicalize(url) == url
+
+    def test_sort_params_normalizes_order(self):
+        a = canonicalize("https://example.com/?b=2&a=1", sort_params=True)
+        b = canonicalize("https://example.com/?a=1&b=2", sort_params=True)
+        assert a == b
+
+    def test_sort_params_and_strip_fragment(self):
+        url = "https://example.com/?b=2&a=1#top"
+        result = canonicalize(url, sort_params=True)
+        assert "#" not in result
+        assert "a=1" in result and "b=2" in result
+
+
+class TestFrontierCanonicalization:
+    @pytest.mark.asyncio
+    async def test_fragment_variants_deduplicated(self):
+        f = Frontier()
+        r1 = await f.push(Request(url="https://example.com/page#intro"))
+        r2 = await f.push(Request(url="https://example.com/page#footer"))
+        assert r1 is True
+        assert r2 is False  # same canonical URL
+
+    @pytest.mark.asyncio
+    async def test_seen_strips_fragment(self):
+        f = Frontier()
+        await f.push(Request(url="https://example.com/page"))
+        assert f.seen("https://example.com/page#section") is True
+
+    @pytest.mark.asyncio
+    async def test_sort_params_deduplication(self):
+        f = Frontier(sort_params=True)
+        r1 = await f.push(Request(url="https://example.com/?b=2&a=1"))
+        r2 = await f.push(Request(url="https://example.com/?a=1&b=2"))
+        assert r1 is True
+        assert r2 is False
+
+    @pytest.mark.asyncio
+    async def test_different_params_not_merged_without_sort(self):
+        f = Frontier()
+        r1 = await f.push(Request(url="https://example.com/?b=2&a=1"))
+        r2 = await f.push(Request(url="https://example.com/?a=1&b=2"))
+        assert r1 is True
+        assert r2 is True  # treated as distinct without sort_params

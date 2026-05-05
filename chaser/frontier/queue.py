@@ -3,11 +3,27 @@ from __future__ import annotations
 import asyncio
 import math
 from typing import Literal
+from urllib.parse import parse_qsl, urldefrag, urlencode, urlparse
 
 import mmh3
 from bitarray import bitarray
 
 from chaser.net.request import Request
+
+
+def canonicalize(url: str, *, sort_params: bool = False) -> str:
+    """Normalize *url* before deduplication.
+
+    Always strips the fragment (#section) — two URLs that differ only by
+    fragment point to the same resource. Optionally sorts query parameters
+    so ``?b=2&a=1`` and ``?a=1&b=2`` are treated as the same URL.
+    """
+    url, _ = urldefrag(url)
+    if sort_params:
+        parsed = urlparse(url)
+        qs = urlencode(sorted(parse_qsl(parsed.query)))
+        url = parsed._replace(query=qs).geturl()
+    return url
 
 
 class BloomFilter:
@@ -81,6 +97,10 @@ class Frontier:
     - ``bfs``   — breadth-first; requests leave in insertion order (FIFO)
     - ``dfs``   — depth-first; most recently added request leaves first (LIFO)
     - ``score`` — user-controlled; higher ``request.priority`` leaves first
+
+    URL canonicalization is applied before deduplication: fragments are always
+    stripped, and query parameters can optionally be sorted so that
+    ``?b=2&a=1`` and ``?a=1&b=2`` resolve to the same URL.
     """
 
     def __init__(
@@ -88,13 +108,18 @@ class Frontier:
         strategy: Strategy = "bfs",
         bloom_capacity: int = 100_000,
         bloom_error_rate: float = 0.001,
+        sort_params: bool = False,
     ) -> None:
         self._strategy: Strategy = strategy
+        self._sort_params = sort_params
         self._bloom = BloomFilter(capacity=bloom_capacity, error_rate=bloom_error_rate)
         # tuple: (sort_key, insertion_counter, request)
         # insertion_counter breaks ties and avoids comparing Request objects
         self._queue: asyncio.PriorityQueue[tuple[int, int, Request]] = asyncio.PriorityQueue()
         self._counter = 0
+
+    def _canonical(self, url: str) -> str:
+        return canonicalize(url, sort_params=self._sort_params)
 
     def _sort_key(self, request: Request) -> int:
         """Lower value = pulled sooner (min-heap semantics)."""
@@ -107,7 +132,7 @@ class Frontier:
 
     def seen(self, url: str) -> bool:
         """Return True if this URL has already been scheduled."""
-        return url in self._bloom
+        return self._canonical(url) in self._bloom
 
     async def push(self, request: Request) -> bool:
         """Enqueue a request.
@@ -115,9 +140,10 @@ class Frontier:
         Returns False without enqueuing if the URL was seen before (dedup).
         Returns True when the request is accepted.
         """
-        if request.url in self._bloom:
+        key = self._canonical(request.url)
+        if key in self._bloom:
             return False
-        self._bloom.add(request.url)
+        self._bloom.add(key)
         await self._queue.put((self._sort_key(request), self._counter, request))
         self._counter += 1
         return True
