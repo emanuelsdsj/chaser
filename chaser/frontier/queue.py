@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 from typing import Literal
 from urllib.parse import parse_qsl, urldefrag, urlencode, urlparse
@@ -9,6 +10,8 @@ import mmh3
 from bitarray import bitarray
 
 from chaser.net.request import Request
+
+logger = logging.getLogger(__name__)
 
 
 def canonicalize(url: str, *, sort_params: bool = False) -> str:
@@ -34,19 +37,28 @@ class BloomFilter:
     need to tune those directly.
     """
 
-    def __init__(self, capacity: int = 100_000, error_rate: float = 0.001) -> None:
+    def __init__(
+        self,
+        capacity: int = 100_000,
+        error_rate: float = 0.001,
+        saturation_factor: float = 10.0,
+    ) -> None:
         if not (0 < error_rate < 1):
             raise ValueError(f"error_rate must be between 0 and 1, got {error_rate}")
         if capacity < 1:
             raise ValueError(f"capacity must be >= 1, got {capacity}")
+        if saturation_factor <= 1:
+            raise ValueError(f"saturation_factor must be > 1, got {saturation_factor}")
 
         self.capacity = capacity
         self.error_rate = error_rate
+        self._saturation_factor = saturation_factor
         self._size = self._optimal_size(capacity, error_rate)
         self._hash_count = self._optimal_hash_count(self._size, capacity)
         self._bits = bitarray(self._size)
         self._bits.setall(0)
         self._count = 0
+        self._saturation_warned = False
 
     @staticmethod
     def _optimal_size(n: int, p: float) -> int:
@@ -65,6 +77,22 @@ class BloomFilter:
         for pos in self._positions(item):
             self._bits[pos] = 1
         self._count += 1
+        self._check_saturation()
+
+    def _check_saturation(self) -> None:
+        if self._saturation_warned:
+            return
+        fpr = self.estimated_fpr
+        if fpr >= self.error_rate * self._saturation_factor:
+            self._saturation_warned = True
+            logger.warning(
+                "Bloom filter saturation: FPR %.4f is %.1f× the target (%.4f). "
+                "Increase bloom_capacity (currently %d) to keep dedup accurate.",
+                fpr,
+                fpr / self.error_rate,
+                self.error_rate,
+                self.capacity,
+            )
 
     def __contains__(self, item: object) -> bool:
         if not isinstance(item, str):

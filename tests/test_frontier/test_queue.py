@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import pytest
 
 from chaser.frontier.queue import BloomFilter, Frontier, canonicalize
@@ -74,6 +76,26 @@ class TestBloomFilter:
     def test_invalid_capacity_raises(self) -> None:
         with pytest.raises(ValueError):
             BloomFilter(capacity=0)
+
+    def test_invalid_saturation_factor_raises(self) -> None:
+        with pytest.raises(ValueError):
+            BloomFilter(capacity=100, saturation_factor=1.0)
+
+    def test_saturation_warning_fires_once(self, caplog: pytest.LogCaptureFixture) -> None:
+        # tiny capacity so we can saturate it quickly
+        bf = BloomFilter(capacity=10, error_rate=0.001, saturation_factor=2.0)
+        with caplog.at_level(logging.WARNING, logger="chaser.frontier.queue"):
+            for i in range(500):
+                bf.add(str(i))
+        warnings = [r for r in caplog.records if "saturation" in r.message.lower()]
+        assert len(warnings) == 1
+
+    def test_no_warning_below_threshold(self, caplog: pytest.LogCaptureFixture) -> None:
+        bf = BloomFilter(capacity=100_000, error_rate=0.001, saturation_factor=10.0)
+        with caplog.at_level(logging.WARNING, logger="chaser.frontier.queue"):
+            for i in range(100):
+                bf.add(str(i))
+        assert not any("saturation" in r.message.lower() for r in caplog.records)
 
 
 # ---------------------------------------------------------------------------
