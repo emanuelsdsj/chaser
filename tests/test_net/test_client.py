@@ -291,3 +291,84 @@ class TestPerRequestTimeout:
                 await client.fetch(Request("http://example.com/"))
 
         assert captured == [42.0]
+
+
+class TestNetClientCache:
+    @respx.mock
+    async def test_cache_miss_fetches_and_stores(self, tmp_path: object) -> None:
+        respx.get("http://example.com/").mock(
+            return_value=httpx.Response(
+                200, content=b"fresh", headers={"cache-control": "max-age=3600"}
+            )
+        )
+        from chaser.net.cache import HttpCache
+
+        cache = HttpCache(tmp_path)  # type: ignore[arg-type]
+        async with NetClient(http2=False, cache=cache) as client:
+            resp = await client.fetch(Request("http://example.com/"))
+
+        assert resp.body == b"fresh"
+        assert resp.from_cache is False
+        assert cache.lookup(Request("http://example.com/")).fresh
+
+    @respx.mock
+    async def test_fresh_cache_hit_skips_network(self, tmp_path: object) -> None:
+        from chaser.net.cache import HttpCache
+        from chaser.net.headers import Headers
+        from chaser.net.response import Response
+
+        cache = HttpCache(tmp_path)  # type: ignore[arg-type]
+        req = Request("http://example.com/")
+        cache.store(
+            req,
+            Response(
+                url="http://example.com/",
+                status=200,
+                headers=Headers({"cache-control": "max-age=3600"}),
+                body=b"cached",
+            ),
+        )
+
+        route = respx.get("http://example.com/")
+        async with NetClient(http2=False, cache=cache) as client:
+            resp = await client.fetch(req)
+
+        assert resp.body == b"cached"
+        assert resp.from_cache is True
+        assert not route.called
+
+    @respx.mock
+    async def test_304_returns_cached_response(self, tmp_path: object) -> None:
+        from chaser.net.cache import HttpCache
+        from chaser.net.headers import Headers
+        from chaser.net.response import Response
+
+        cache = HttpCache(tmp_path)  # type: ignore[arg-type]
+        req = Request("http://example.com/")
+        cache.store(
+            req,
+            Response(
+                url="http://example.com/",
+                status=200,
+                headers=Headers({"etag": '"v1"'}),
+                body=b"still valid",
+            ),
+        )
+
+        respx.get("http://example.com/").mock(return_value=httpx.Response(304))
+        async with NetClient(http2=False, cache=cache) as client:
+            resp = await client.fetch(req)
+
+        assert resp.body == b"still valid"
+        assert resp.from_cache is True
+
+    @respx.mock
+    async def test_no_cache_without_cache_param(self) -> None:
+        respx.get("http://example.com/").mock(
+            return_value=httpx.Response(200, content=b"ok")
+        )
+        async with NetClient(http2=False) as client:
+            resp = await client.fetch(Request("http://example.com/"))
+
+        assert resp.body == b"ok"
+        assert resp.from_cache is False

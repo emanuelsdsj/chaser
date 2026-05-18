@@ -12,6 +12,7 @@ from chaser.net.response import Response
 
 if TYPE_CHECKING:
     from chaser.hooks.base import FetchHook
+    from chaser.net.cache import HttpCache
 
 
 class CircuitState(Enum):
@@ -104,6 +105,7 @@ class NetClient:
         follow_redirects: bool = True,
         verify: bool = True,
         hooks: list[FetchHook] | None = None,
+        cache: HttpCache | None = None,
     ) -> None:
         self._http2 = http2
         self._timeout = timeout
@@ -119,6 +121,7 @@ class NetClient:
         self._breakers: dict[str, CircuitBreaker] = {}
         self._client: httpx.AsyncClient | None = None
         self._hooks: list[FetchHook] = hooks or []
+        self._cache = cache
 
     def _make_client(self) -> httpx.AsyncClient:
         kwargs: dict[str, Any] = {
@@ -157,6 +160,18 @@ class NetClient:
         for hook in self._hooks:
             request = await hook.before_request(request)
 
+        # Cache check — only for GET requests
+        cached: Response | None = None
+        if self._cache and request.method == "GET":
+            lookup = self._cache.lookup(request)
+            if lookup.fresh and lookup.response is not None:
+                return lookup.response  # serve directly from disk, no network
+            if lookup.response is not None and lookup.conditional_headers:
+                cached = lookup.response
+                request = request.copy(
+                    headers=Headers({**dict(request.headers), **lookup.conditional_headers})
+                )
+
         host = httpx.URL(request.url).host
         breaker = self._breaker_for(host)
 
@@ -184,6 +199,12 @@ class NetClient:
         elapsed = time.monotonic() - t0
         breaker.record_success()
 
+        # 304 Not Modified — server confirmed the cached response is still valid
+        if raw.status_code == 304 and cached is not None:
+            if self._cache is not None:
+                self._cache.touch(request)
+            return cached
+
         encoding = raw.encoding or "utf-8"
         seen: dict[str, list[str]] = {}
         for k, v in raw.headers.multi_items():
@@ -200,6 +221,9 @@ class NetClient:
             elapsed=elapsed,
             request=request,
         )
+
+        if self._cache:
+            self._cache.store(request, response)
 
         for hook in self._hooks:
             response = await hook.after_response(response)

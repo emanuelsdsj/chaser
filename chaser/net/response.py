@@ -21,6 +21,7 @@ class Response:
     encoding: str = "utf-8"
     elapsed: float = 0.0
     request: Request | None = None
+    from_cache: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.headers, Headers):
