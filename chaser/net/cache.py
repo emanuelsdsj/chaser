@@ -99,12 +99,12 @@ class HttpCache:
         if response.status not in self._CACHEABLE:
             return
 
-        cc = response.headers.get("cache-control", "")
+        cc = response.headers.get("cache-control", "") or ""
         if self._RE_NO_STORE.search(cc):
             return
 
-        etag = response.headers.get("etag", "")
-        last_modified = response.headers.get("last-modified", "")
+        etag = response.headers.get("etag", "") or ""
+        last_modified = response.headers.get("last-modified", "") or ""
         expires_at = self._compute_expires(response)
 
         if expires_at is None and not etag and not last_modified:
@@ -148,7 +148,7 @@ class HttpCache:
 
         now = time.time()
         meta["cached_at"] = now
-        cc = Headers(meta.get("headers", {})).get("cache-control", "")
+        cc = Headers(meta.get("headers", {})).get("cache-control", "") or ""
         m = self._RE_MAX_AGE.search(cc)
         if m:
             meta["expires_at"] = now + int(m.group(1))
@@ -163,11 +163,11 @@ class HttpCache:
         return float(expires_at) > time.time()
 
     def _compute_expires(self, response: Response) -> float | None:
-        cc = response.headers.get("cache-control", "")
+        cc = response.headers.get("cache-control", "") or ""
         m = self._RE_MAX_AGE.search(cc)
         if m:
             return time.time() + int(m.group(1))
-        raw = response.headers.get("expires", "").strip()
+        raw = (response.headers.get("expires", "") or "").strip()
         if raw and raw != "0":
             try:
                 return parsedate_to_datetime(raw).timestamp()
