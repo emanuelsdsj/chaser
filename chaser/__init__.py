@@ -11,6 +11,7 @@ from chaser.hooks.retry import RetryPolicy
 from chaser.hooks.robots import RobotsHook
 from chaser.item.base import Item
 from chaser.item.loader import ItemLoader, compose, first, join, strip, take_all
+from chaser.net.cache import HttpCache
 from chaser.net.request import Request
 from chaser.net.response import Response
 from chaser.pipeline.base import Pipeline, Stage
@@ -35,6 +36,7 @@ __all__ = [
     "first",
     "take_all",
     "compose",
+    "HttpCache",
     "Request",
     "Response",
     "Pipeline",

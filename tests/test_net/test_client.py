@@ -364,9 +364,7 @@ class TestNetClientCache:
 
     @respx.mock
     async def test_no_cache_without_cache_param(self) -> None:
-        respx.get("http://example.com/").mock(
-            return_value=httpx.Response(200, content=b"ok")
-        )
+        respx.get("http://example.com/").mock(return_value=httpx.Response(200, content=b"ok"))
         async with NetClient(http2=False) as client:
             resp = await client.fetch(Request("http://example.com/"))
 

@@ -4,6 +4,7 @@ import asyncio
 import logging
 from collections.abc import Sequence
 from contextlib import nullcontext
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from chaser.engine import trap
@@ -55,6 +56,7 @@ class Engine:
         retry: RetryPolicy | None = None,
         pipeline: Pipeline | None = None,
         browser: bool = False,
+        cache_dir: str | Path | None = None,
     ) -> None:
         self._concurrency = concurrency
         self._strategy = strategy
@@ -65,6 +67,10 @@ class Engine:
             "proxy": proxy,
             "hooks": hooks or [],
         }
+        if cache_dir is not None:
+            from chaser.net.cache import HttpCache
+
+            self._net_kwargs["cache"] = HttpCache(cache_dir)
         self._frontier = Frontier(strategy=strategy)  # type: ignore[arg-type]
         self._items: list[Item] = []
         self._retry = retry
@@ -224,8 +230,11 @@ class Engine:
         while True:
             try:
                 response = await net.fetch(request)
-                self.stats.requests_ok += 1
-                self.stats.bytes_downloaded += len(response.body)
+                if response.from_cache:
+                    self.stats.cache_hits += 1
+                else:
+                    self.stats.requests_ok += 1
+                    self.stats.bytes_downloaded += len(response.body)
                 return response
             except CircuitOpenError as exc:
                 logger.debug("Circuit open — skipping %s (%s)", request.url, exc)

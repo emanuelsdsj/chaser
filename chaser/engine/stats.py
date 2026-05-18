@@ -22,6 +22,7 @@ class CrawlStats:
     requests_sent: int = 0
     requests_ok: int = 0
     requests_failed: int = 0
+    cache_hits: int = 0
     items_scraped: int = 0
     bytes_downloaded: int = 0
     timeouts: int = 0
@@ -51,6 +52,7 @@ class CrawlStats:
             f"requests_sent={self.requests_sent}, "
             f"requests_ok={self.requests_ok}, "
             f"requests_failed={self.requests_failed}, "
+            f"cache_hits={self.cache_hits}, "
             f"timeouts={self.timeouts}, "
             f"errors_by_status={self.errors_by_status}, "
             f"items_scraped={self.items_scraped}, "
