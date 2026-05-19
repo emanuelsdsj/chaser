@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 
 @dataclass
@@ -29,6 +29,10 @@ class CrawlStats:
     errors_by_status: dict[int, int] = field(default_factory=dict)
     _start: float = field(default_factory=time.monotonic, repr=False)
     _finish: float | None = field(default=None, repr=False)
+
+    def snapshot(self) -> CrawlStats:
+        """Point-in-time copy — safe to inspect from a callback while the crawl runs."""
+        return replace(self, errors_by_status=dict(self.errors_by_status))
 
     def _mark_finished(self) -> None:
         self._finish = time.monotonic()
