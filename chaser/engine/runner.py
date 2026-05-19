@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from contextlib import nullcontext
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -57,6 +57,8 @@ class Engine:
         pipeline: Pipeline | None = None,
         browser: bool = False,
         cache_dir: str | Path | None = None,
+        on_stats: Callable[[CrawlStats], Any] | None = None,
+        stats_interval: float = 60.0,
     ) -> None:
         self._concurrency = concurrency
         self._strategy = strategy
@@ -76,6 +78,8 @@ class Engine:
         self._retry = retry
         self._pipeline = pipeline
         self._use_browser = browser
+        self._on_stats = on_stats
+        self._stats_interval = stats_interval
         self.stats = CrawlStats()
 
     async def run(self, trappers: Sequence[Trapper] | Trapper) -> list[Item]:
@@ -98,6 +102,7 @@ class Engine:
         for trapper in trappers:
             await trapper.open()
 
+        stats_task: asyncio.Task[None] | None = None
         try:
             async with (
                 browser_ctx as browser_client,
@@ -114,6 +119,9 @@ class Engine:
                     self.stats._mark_finished()
                     return self._items
 
+                if self._on_stats is not None:
+                    stats_task = asyncio.create_task(self._stats_reporter())
+
                 workers = [
                     asyncio.create_task(self._worker(net, browser_client, trapper_map))
                     for _ in range(self._concurrency)
@@ -125,6 +133,10 @@ class Engine:
                     w.cancel()
                 await asyncio.gather(*workers, return_exceptions=True)
         finally:
+            if stats_task is not None:
+                stats_task.cancel()
+                await asyncio.gather(stats_task, return_exceptions=True)
+
             for trapper in reversed(list(trappers)):
                 try:
                     await trapper.close()
@@ -138,6 +150,14 @@ class Engine:
         from chaser.browser.client import BrowserClient
 
         return BrowserClient()
+
+    async def _stats_reporter(self) -> None:
+        assert self._on_stats is not None
+        while True:
+            result = self._on_stats(self.stats.snapshot())
+            if asyncio.iscoroutine(result):
+                await result
+            await asyncio.sleep(self._stats_interval)
 
     async def _worker(
         self,
