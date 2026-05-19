@@ -240,3 +240,90 @@ async def test_stats_timeouts_incremented() -> None:
 
     assert engine.stats.timeouts == 1
     assert engine.stats.requests_failed == 1
+
+
+# ---------------------------------------------------------------------------
+# snapshot()
+# ---------------------------------------------------------------------------
+
+
+def test_snapshot_is_independent_copy() -> None:
+    s = CrawlStats(requests_sent=5, items_scraped=2)
+    snap = s.snapshot()
+
+    s.requests_sent = 99
+    s._record_status_error(500)
+
+    assert snap.requests_sent == 5
+    assert snap.errors_by_status == {}
+
+
+def test_snapshot_copies_errors_by_status() -> None:
+    s = CrawlStats()
+    s._record_status_error(404)
+    snap = s.snapshot()
+
+    s._record_status_error(404)  # mutate original
+
+    assert snap.errors_by_status == {404: 1}
+    assert s.errors_by_status == {404: 2}
+
+
+# ---------------------------------------------------------------------------
+# on_stats callback
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+async def test_on_stats_sync_callback_called() -> None:
+    respx.get("http://a.com/").mock(return_value=httpx.Response(200, content=b"x"))
+
+    calls: list[CrawlStats] = []
+    engine = Engine(concurrency=1, http2=False, on_stats=calls.append, stats_interval=0.01)
+    await engine.run(_SimpleTrpper(["http://a.com/"]))
+
+    assert len(calls) >= 1
+    assert all(isinstance(s, CrawlStats) for s in calls)
+
+
+@respx.mock
+async def test_on_stats_receives_snapshot_not_live() -> None:
+    """Callback gets a frozen copy — mutating it must not affect engine.stats."""
+    respx.get("http://a.com/").mock(return_value=httpx.Response(200, content=b"x"))
+
+    received: list[CrawlStats] = []
+
+    def _cb(snap: CrawlStats) -> None:
+        snap.requests_sent = 9999  # mutate the snapshot
+        received.append(snap)
+
+    engine = Engine(concurrency=1, http2=False, on_stats=_cb, stats_interval=0.01)
+    await engine.run(_SimpleTrpper(["http://a.com/"]))
+
+    assert engine.stats.requests_sent != 9999
+
+
+@respx.mock
+async def test_on_stats_async_callback_called() -> None:
+    respx.get("http://a.com/").mock(return_value=httpx.Response(200, content=b"x"))
+
+    calls: list[CrawlStats] = []
+
+    async def _async_cb(snap: CrawlStats) -> None:
+        calls.append(snap)
+
+    engine = Engine(concurrency=1, http2=False, on_stats=_async_cb, stats_interval=0.01)
+    await engine.run(_SimpleTrpper(["http://a.com/"]))
+
+    assert len(calls) >= 1
+
+
+@respx.mock
+async def test_on_stats_none_by_default() -> None:
+    """No callback — engine must run normally with no reporter task."""
+    respx.get("http://a.com/").mock(return_value=httpx.Response(200, content=b"x"))
+
+    engine = Engine(concurrency=1, http2=False)
+    await engine.run(_SimpleTrpper(["http://a.com/"]))
+
+    assert engine.stats.requests_sent == 1
