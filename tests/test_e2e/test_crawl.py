@@ -445,3 +445,71 @@ async def test_rate_limiter_does_not_break_crawl(httpserver: HTTPServer) -> None
     )
     items = await engine.run(PagesTrapper())
     assert len(items) == 3
+
+
+# ---------------------------------------------------------------------------
+# Crawl resume — Engine(frontier_db=...)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_crawl_resume_skips_seen_urls(httpserver: HTTPServer, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """Second run should not re-fetch URLs already seen in the first run."""
+    for i in range(3):
+        httpserver.expect_request(f"/p{i}").respond_with_data(
+            html_page(f"Page {i}"), content_type="text/html"
+        )
+
+    db = tmp_path / "frontier.db"
+
+    class ThreePageTrapper(Trapper):
+        name = "pages"
+        start_urls = [httpserver.url_for(f"/p{i}") for i in range(3)]
+
+        async def parse(self, response: Response):  # type: ignore[override]
+            yield PageItem(url=response.url, title=response.selector.css("title::text").get(""))
+
+    engine = Engine(concurrency=1, http2=False, frontier_db=db)
+    items = await engine.run(ThreePageTrapper())
+    assert len(items) == 3
+
+    # Second run with same DB — all URLs already seen, nothing new to fetch
+    engine2 = Engine(concurrency=1, http2=False, frontier_db=db)
+    items2 = await engine2.run(ThreePageTrapper())
+    assert items2 == []
+    assert engine2.stats.requests_sent == 0
+
+
+@pytest.mark.asyncio
+async def test_crawl_resume_picks_up_pending(httpserver: HTTPServer, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """Pending requests left in the DB carry over to the next run."""
+    for i in range(4):
+        httpserver.expect_request(f"/q{i}").respond_with_data(
+            html_page(f"Page {i}"), content_type="text/html"
+        )
+
+    db = tmp_path / "resume.db"
+
+    # Seed the DB with 4 URLs but don't actually run a crawl
+    from chaser.frontier.sqlite import SqliteFrontier
+    from chaser.net.request import Request as Req
+
+    sf = SqliteFrontier(db)
+    sf.open()
+    for i in range(4):
+        await sf.push(Req(url=httpserver.url_for(f"/q{i}"), meta={"trapper": "resume"}))
+    sf.close()
+
+    class ResumeTrapper(Trapper):
+        name = "resume"
+        start_urls: list[str] = []  # no fresh seeds — relying on DB state
+
+        async def parse(self, response: Response):  # type: ignore[override]
+            yield PageItem(url=response.url, title=response.selector.css("title::text").get(""))
+
+    engine = Engine(concurrency=2, http2=False, frontier_db=db)
+    items = await engine.run(ResumeTrapper())
+
+    # All 4 pending requests should have been processed
+    assert engine.stats.requests_sent == 4
+    assert len(items) == 4

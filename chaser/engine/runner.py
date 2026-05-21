@@ -18,6 +18,7 @@ from chaser.trapper.base import Trapper
 
 if TYPE_CHECKING:
     from chaser.browser.client import BrowserClient
+    from chaser.frontier.sqlite import SqliteFrontier
     from chaser.hooks.base import FetchHook
     from chaser.hooks.retry import RetryPolicy
     from chaser.pipeline.base import Pipeline
@@ -59,6 +60,7 @@ class Engine:
         cache_dir: str | Path | None = None,
         on_stats: Callable[[CrawlStats], Any] | None = None,
         stats_interval: float = 60.0,
+        frontier_db: str | Path | None = None,
     ) -> None:
         self._concurrency = concurrency
         self._strategy = strategy
@@ -73,7 +75,8 @@ class Engine:
             from chaser.net.cache import HttpCache
 
             self._net_kwargs["cache"] = HttpCache(cache_dir)
-        self._frontier = Frontier(strategy=strategy)  # type: ignore[arg-type]
+        self._frontier_db: Path | None = Path(frontier_db) if frontier_db is not None else None
+        self._frontier: Frontier | SqliteFrontier = Frontier(strategy=strategy)  # type: ignore[arg-type]
         self._items: list[Item] = []
         self._retry = retry
         self._pipeline = pipeline
@@ -93,7 +96,16 @@ class Engine:
 
         self.stats = CrawlStats()
         self._items = []
-        self._frontier = Frontier(strategy=self._strategy)  # type: ignore[arg-type]
+
+        if self._frontier_db is not None:
+            from chaser.frontier.sqlite import SqliteFrontier
+
+            sf = SqliteFrontier(self._frontier_db, strategy=self._strategy)
+            sf.open()
+            self._frontier = sf
+        else:
+            self._frontier = Frontier(strategy=self._strategy)  # type: ignore[arg-type]
+
         trapper_map: dict[str, Trapper] = {t.name: t for t in trappers}
 
         pipeline_ctx = self._pipeline.run() if self._pipeline else nullcontext()
@@ -142,6 +154,12 @@ class Engine:
                     await trapper.close()
                 except Exception:
                     logger.exception("Error closing trapper %r", trapper.name)
+
+            if self._frontier_db is not None:
+                from chaser.frontier.sqlite import SqliteFrontier
+
+                if isinstance(self._frontier, SqliteFrontier):
+                    self._frontier.close()
 
         self.stats._mark_finished()
         return self._items
