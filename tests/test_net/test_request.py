@@ -113,3 +113,65 @@ def test_from_form_custom_headers_preserved():
 def test_from_form_custom_method():
     r = Request.from_form("https://example.com/", {"x": "1"}, method="PUT")
     assert r.method == "PUT"
+
+
+# ---------------------------------------------------------------------------
+# serialisation round-trip
+# ---------------------------------------------------------------------------
+
+
+def test_to_dict_round_trip_minimal():
+    r = Request(url="https://example.com/page")
+    d = r.to_dict()
+    r2 = Request.from_dict(d)
+    assert r2.url == r.url
+    assert r2.method == r.method
+    assert r2.priority == r.priority
+    assert r2.body is None
+    assert r2.callback is None
+    assert r2.use_browser is False
+
+
+def test_to_dict_round_trip_full():
+    r = Request(
+        url="https://example.com/submit",
+        method="POST",
+        headers={"content-type": "application/json", "x-token": "abc"},
+        body=b"\x00\x01binary\xff",
+        meta={"trapper": "my_trapper", "depth": 2},
+        priority=5,
+        callback="parse_detail",
+        use_browser=True,
+    )
+    d = r.to_dict()
+    r2 = Request.from_dict(d)
+
+    assert r2.url == r.url
+    assert r2.method == r.method
+    assert r2.headers["content-type"] == "application/json"
+    assert r2.headers["x-token"] == "abc"
+    assert r2.body == b"\x00\x01binary\xff"
+    assert r2.meta == {"trapper": "my_trapper", "depth": 2}
+    assert r2.priority == 5
+    assert r2.callback == "parse_detail"
+    assert r2.use_browser is True
+
+
+def test_to_dict_body_is_base64_string():
+    r = Request(url="https://example.com", body=b"hello")
+    d = r.to_dict()
+    assert isinstance(d["body"], str)
+
+
+def test_to_dict_no_body_is_none():
+    r = Request(url="https://example.com")
+    assert r.to_dict()["body"] is None
+
+
+def test_from_dict_missing_optional_fields():
+    r = Request.from_dict({"url": "https://example.com"})
+    assert r.method == "GET"
+    assert r.priority == 0
+    assert r.use_browser is False
+    assert r.body is None
+    assert r.callback is None

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import dataclasses
 from dataclasses import dataclass, field
 from typing import Any
@@ -46,6 +47,37 @@ class Request:
             body=urlencode(data).encode("utf-8"),
             headers=Headers(merged),
             **kwargs,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise to a JSON-compatible dict.
+
+        ``meta`` values must be JSON-serialisable — this is only relevant
+        when using ``Engine(frontier_db=...)`` for crawl resume.
+        """
+        return {
+            "url": self.url,
+            "method": self.method,
+            "headers": dict(self.headers),
+            "body": base64.b64encode(self.body).decode("ascii") if self.body is not None else None,
+            "meta": self.meta,
+            "priority": self.priority,
+            "callback": self.callback,
+            "use_browser": self.use_browser,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Request:
+        body_b64: str | None = data.get("body")
+        return cls(
+            url=data["url"],
+            method=data.get("method", "GET"),
+            headers=Headers(data.get("headers") or {}),
+            body=base64.b64decode(body_b64) if body_b64 is not None else None,
+            meta=data.get("meta") or {},
+            priority=data.get("priority", 0),
+            callback=data.get("callback"),
+            use_browser=data.get("use_browser", False),
         )
 
     def copy(self, **overrides: Any) -> Request:
