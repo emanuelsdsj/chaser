@@ -3,7 +3,7 @@
 A web crawling and data extraction framework built on modern Python asyncio.
 
 HTTP/2 by default. Pydantic-validated items. Bloom filter dedup.
-No legacy event loop libraries — just plain asyncio.
+No legacy event loop libraries, just plain asyncio.
 
 ---
 

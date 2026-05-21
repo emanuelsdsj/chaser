@@ -238,7 +238,7 @@ class TestOrdering:
             for url in urls:
                 await f.push(_req(url))
             popped = [await f.pop() for _ in urls]
-            for p in popped:
+            for _p in popped:
                 f.task_done()
             assert [r.url for r in popped] == urls
         finally:
@@ -251,7 +251,7 @@ class TestOrdering:
             for url in urls:
                 await f.push(_req(url))
             popped = [await f.pop() for _ in urls]
-            for p in popped:
+            for _p in popped:
                 f.task_done()
             assert [r.url for r in popped] == list(reversed(urls))
         finally:
