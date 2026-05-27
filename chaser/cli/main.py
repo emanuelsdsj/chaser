@@ -279,9 +279,7 @@ def serve(
     host: Annotated[str, typer.Option(help="Bind host")] = "127.0.0.1",
     port: Annotated[int, typer.Option(help="Bind port")] = "8000",  # type: ignore[assignment]
     reload: Annotated[bool, typer.Option("--reload", help="Auto-reload on code changes")] = False,
-    log_level: Annotated[
-        str, typer.Option("--log-level", help="Uvicorn log level")
-    ] = "info",
+    log_level: Annotated[str, typer.Option("--log-level", help="Uvicorn log level")] = "info",
 ) -> None:
     """Start the Chaser REST API server.
 

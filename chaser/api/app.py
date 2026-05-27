@@ -137,16 +137,12 @@ async def cancel_crawl(crawl_id: str) -> None:
     if job is None:
         raise HTTPException(status_code=404, detail="crawl not found")
     if job.status not in (JobStatus.pending, JobStatus.running):
-        raise HTTPException(
-            status_code=409, detail=f"crawl is already {job.status.value}"
-        )
+        raise HTTPException(status_code=409, detail=f"crawl is already {job.status.value}")
     _manager.cancel(crawl_id)
 
 
 @app.get("/crawls/{crawl_id}/items")
-async def get_items(
-    crawl_id: str, limit: int = 100, offset: int = 0
-) -> dict[str, Any]:
+async def get_items(crawl_id: str, limit: int = 100, offset: int = 0) -> dict[str, Any]:
     """Get items collected by a crawl job (paginated)."""
     job = _manager.get(crawl_id)
     if job is None:
