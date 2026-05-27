@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from click.exceptions import Exit as ClickExit
+from typer import Exit as TyExit
 from typer.testing import CliRunner
 
 from chaser import __version__
@@ -39,17 +39,17 @@ def test_import_trapper_valid() -> None:
 
 
 def test_import_trapper_missing_colon() -> None:
-    with pytest.raises(ClickExit):
+    with pytest.raises(TyExit):
         _import_trapper("chaser.trapper.base")
 
 
 def test_import_trapper_bad_module() -> None:
-    with pytest.raises(ClickExit):
+    with pytest.raises(TyExit):
         _import_trapper("chaser.nonexistent.module:Foo")
 
 
 def test_import_trapper_missing_class() -> None:
-    with pytest.raises(ClickExit):
+    with pytest.raises(TyExit):
         _import_trapper("chaser.trapper.base:NoSuchClass")
 
 
