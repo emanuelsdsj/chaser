@@ -37,6 +37,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+api = ["fastapi>=0.111", "uvicorn[standard]>=0.30"]
 browser = ["playwright>=1.44"]
 db = ["sqlalchemy>=2.0", "aiosqlite>=0.20"]
 dev = [
@@ -48,6 +49,8 @@ dev = [
     "mypy>=1.10",
     "pre-commit>=3.7",
     "ruff>=0.4",
+    "fastapi>=0.111",
+    "httpx>=0.27",
 ]
 
 [project.scripts]
@@ -87,6 +90,10 @@ addopts = "--tb=short -q"
 python_version = "3.11"
 strict = true
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "chaser.api.app"
+disable_error_code = ["untyped-decorator"]
 
 [tool.coverage.run]
 source = ["chaser"]

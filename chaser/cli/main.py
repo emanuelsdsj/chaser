@@ -274,6 +274,46 @@ dist/
     typer.echo(f"  chaser run {pkg}.trappers:{pkg.title().replace('_', '')}Trapper")
 
 
+@app.command()
+def serve(
+    host: Annotated[str, typer.Option(help="Bind host")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(help="Bind port")] = "8000",  # type: ignore[assignment]
+    reload: Annotated[bool, typer.Option("--reload", help="Auto-reload on code changes")] = False,
+    log_level: Annotated[
+        str, typer.Option("--log-level", help="Uvicorn log level")
+    ] = "info",
+) -> None:
+    """Start the Chaser REST API server.
+
+    Requires the ``chaser[api]`` extra (FastAPI + uvicorn).
+
+    Crawl jobs can then be submitted and monitored via HTTP:
+
+    \\b
+        POST   /crawls              start a crawl
+        GET    /crawls              list all jobs
+        GET    /crawls/{id}         get status and stats
+        DELETE /crawls/{id}         cancel a running job
+        GET    /crawls/{id}/items   fetch collected items
+    """
+    try:
+        import uvicorn
+    except ImportError:
+        typer.echo(
+            "Error: uvicorn is not installed. Run: pip install 'chaser[api]'",
+            err=True,
+        )
+        raise typer.Exit(1) from None
+
+    uvicorn.run(
+        "chaser.api.app:app",
+        host=host,
+        port=port,
+        reload=reload,
+        log_level=log_level,
+    )
+
+
 def main() -> None:
     app()
 
