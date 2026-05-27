@@ -1,7 +1,6 @@
 """Tests for the REST API (chaser[api] extra)."""
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -11,7 +10,6 @@ from chaser.api.app import _manager, app
 from chaser.api.manager import CrawlJob, CrawlManager, JobStatus
 from chaser.engine.stats import CrawlStats
 from chaser.item.base import Item
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
