@@ -1,6 +1,7 @@
 """Chaser — a fast, async web crawling framework built on modern Python."""
 
 from chaser.browser.client import BrowserClient
+from chaser.browser.pool import BrowserPool
 from chaser.engine.runner import Engine
 from chaser.engine.stats import CrawlStats
 from chaser.hooks.autothrottle import AutoThrottleHook
@@ -50,5 +51,6 @@ __all__ = [
     "RobotsHook",
     "AutoThrottleHook",
     "BrowserClient",
+    "BrowserPool",
     "__version__",
 ]
