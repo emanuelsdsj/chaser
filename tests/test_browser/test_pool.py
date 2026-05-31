@@ -84,7 +84,7 @@ def test_import_guard_raises_on_enter() -> None:
             with pytest.raises(ImportError, match="playwright is required"):
                 await pool.__aenter__()
 
-        asyncio.get_event_loop().run_until_complete(_check())
+        asyncio.run(_check())
 
 
 # ---------------------------------------------------------------------------
