@@ -5,11 +5,14 @@ import importlib
 import uuid
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from chaser.engine.runner import Engine
 from chaser.engine.stats import CrawlStats
 from chaser.item.base import Item
+
+if TYPE_CHECKING:
+    from chaser.metrics.collector import ChaserMetrics
 
 
 class JobStatus(StrEnum):
@@ -40,8 +43,9 @@ class CrawlJob:
 class CrawlManager:
     """Manages crawl jobs running as asyncio background tasks."""
 
-    def __init__(self) -> None:
+    def __init__(self, metrics: ChaserMetrics | None = None) -> None:
         self._jobs: dict[str, CrawlJob] = {}
+        self._metrics = metrics
 
     def _load_trapper(self, path: str) -> Any:
         """Import a Trapper class from 'module.path:ClassName' notation."""
@@ -58,9 +62,15 @@ class CrawlManager:
         """Start a crawl job and return its ID."""
         TrapperClass = self._load_trapper(trapper_path)
         trapper = TrapperClass()
-        engine = Engine(**engine_kwargs)
 
         job_id = uuid.uuid4().hex[:8]
+
+        kw = dict(engine_kwargs)
+        if self._metrics is not None:
+            kw["metrics"] = self._metrics
+            kw["job_name"] = job_id
+        engine = Engine(**kw)
+
         job = CrawlJob(id=job_id, trapper_path=trapper_path, _engine=engine)
         self._jobs[job_id] = job
 

@@ -14,7 +14,15 @@ app = FastAPI(
     description="REST interface for managing and monitoring Chaser crawl jobs.",
 )
 
-_manager = CrawlManager()
+try:
+    from chaser.metrics.collector import ChaserMetrics as _ChaserMetrics
+
+    _metrics = _ChaserMetrics()
+    _manager = CrawlManager(metrics=_metrics)
+    app.mount("/metrics", _metrics.make_asgi_app())
+except ImportError:
+    _metrics = None  # type: ignore[assignment]
+    _manager = CrawlManager()
 
 
 # ---------------------------------------------------------------------------
