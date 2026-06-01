@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from chaser.frontier.sqlite import SqliteFrontier
     from chaser.hooks.base import FetchHook
     from chaser.hooks.retry import RetryPolicy
+    from chaser.metrics.collector import ChaserMetrics
     from chaser.pipeline.base import Pipeline
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,8 @@ class Engine:
         on_stats: Callable[[CrawlStats], Any] | None = None,
         stats_interval: float = 60.0,
         frontier_db: str | Path | None = None,
+        metrics: ChaserMetrics | None = None,
+        job_name: str = "default",
     ) -> None:
         self._concurrency = concurrency
         self._strategy = strategy
@@ -83,6 +86,8 @@ class Engine:
         self._use_browser = browser
         self._on_stats = on_stats
         self._stats_interval = stats_interval
+        self._metrics = metrics
+        self._job_name = job_name
         self.stats = CrawlStats()
 
     async def run(self, trappers: Sequence[Trapper] | Trapper) -> list[Item]:
@@ -189,6 +194,9 @@ class Engine:
                 await self._dispatch(net, browser_client, trapper_map, request)
             finally:
                 self._frontier.task_done()
+                if self._metrics is not None:
+                    self._metrics.set_queue_size(self._job_name, self._frontier.qsize())
+                    self._metrics.set_seen_urls(self._job_name, self._frontier.seen_count)
 
     async def _dispatch(
         self,
@@ -237,6 +245,8 @@ class Engine:
 
         if response.status >= 400:
             self.stats._record_status_error(response.status)
+            if self._metrics is not None:
+                self._metrics.record_http_error(self._job_name, response.status)
 
         if trapper is None:
             logger.warning(
@@ -252,6 +262,8 @@ class Engine:
                 await self._frontier.push(result)
             elif isinstance(result, Item):
                 self.stats.items_scraped += 1
+                if self._metrics is not None:
+                    self._metrics.record_item(self._job_name)
                 if self._pipeline is not None:
                     await self._pipeline.process(result)
                 else:
@@ -270,17 +282,27 @@ class Engine:
                 response = await net.fetch(request)
                 if response.from_cache:
                     self.stats.cache_hits += 1
+                    if self._metrics is not None:
+                        self._metrics.record_request(self._job_name, "cached")
                 else:
                     self.stats.requests_ok += 1
                     self.stats.bytes_downloaded += len(response.body)
+                    if self._metrics is not None:
+                        self._metrics.record_request(self._job_name, "ok")
+                        self._metrics.observe_latency(self._job_name, response.elapsed)
+                        self._metrics.record_bytes(self._job_name, len(response.body))
                 return response
             except CircuitOpenError as exc:
                 logger.debug("Circuit open — skipping %s (%s)", request.url, exc)
                 self.stats.requests_failed += 1
+                if self._metrics is not None:
+                    self._metrics.record_request(self._job_name, "circuit_open")
                 return None
             except RequestAborted as exc:
                 logger.debug("Request aborted by hook — %s: %s", request.url, exc)
                 self.stats.requests_failed += 1
+                if self._metrics is not None:
+                    self._metrics.record_request(self._job_name, "aborted")
                 return None
             except TimeoutFetchError as exc:
                 if self._retry and self._retry.should_retry(attempt, exc):
@@ -290,6 +312,8 @@ class Engine:
                     logger.warning("Fetch timed out — %s: %s", request.url, exc)
                     self.stats.timeouts += 1
                     self.stats.requests_failed += 1
+                    if self._metrics is not None:
+                        self._metrics.record_request(self._job_name, "timeout")
                     return None
             except FetchError as exc:
                 if self._retry and self._retry.should_retry(attempt, exc):
@@ -298,4 +322,6 @@ class Engine:
                 else:
                     logger.warning("Fetch failed — %s: %s", request.url, exc)
                     self.stats.requests_failed += 1
+                    if self._metrics is not None:
+                        self._metrics.record_request(self._job_name, "failed")
                     return None
