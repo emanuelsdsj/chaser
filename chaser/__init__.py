@@ -2,10 +2,12 @@
 
 from chaser.browser.client import BrowserClient
 from chaser.browser.pool import BrowserPool
+from chaser.browser.stealth import StealthConfig
 from chaser.engine.runner import Engine
 from chaser.engine.stats import CrawlStats
 from chaser.hooks.autothrottle import AutoThrottleHook
 from chaser.hooks.cookies import CookieJarHook
+from chaser.hooks.har import HarWriter
 from chaser.hooks.proxy import ProxyPool
 from chaser.hooks.ratelimit import RateLimitHook
 from chaser.hooks.retry import RetryPolicy
@@ -22,7 +24,7 @@ from chaser.trapper.base import Trapper
 from chaser.trapper.crawl import CrawlTrapper
 from chaser.trapper.sitemap import SitemapTrapper
 
-__version__ = "0.1.0"
+__version__ = "0.3.0"
 
 __all__ = [
     "Engine",
@@ -52,5 +54,7 @@ __all__ = [
     "AutoThrottleHook",
     "BrowserClient",
     "BrowserPool",
+    "StealthConfig",
+    "HarWriter",
     "__version__",
 ]
