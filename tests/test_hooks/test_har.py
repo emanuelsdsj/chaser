@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -11,7 +10,6 @@ from chaser.hooks.har import HarWriter
 from chaser.net.headers import Headers
 from chaser.net.request import Request
 from chaser.net.response import Response
-
 
 # ---------------------------------------------------------------------------
 # Helpers

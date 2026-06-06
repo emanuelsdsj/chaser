@@ -3,11 +3,11 @@ from __future__ import annotations
 import pytest
 
 from chaser.browser.stealth import (
-    STEALTH_INIT_SCRIPT,
-    StealthConfig,
     _TIMEZONES,
     _USER_AGENTS,
     _VIEWPORTS,
+    STEALTH_INIT_SCRIPT,
+    StealthConfig,
 )
 
 
@@ -100,7 +100,7 @@ class TestBrowserClientStealth:
 
     @pytest.mark.asyncio
     async def test_fetch_with_stealth_uses_new_context(self) -> None:
-        from unittest.mock import AsyncMock, MagicMock
+        from unittest.mock import AsyncMock
 
         from chaser.browser.client import BrowserClient
         from chaser.net.request import Request
@@ -180,7 +180,7 @@ class TestBrowserPoolStealth:
 
     @pytest.mark.asyncio
     async def test_new_slot_without_stealth_creates_bare_page(self) -> None:
-        from unittest.mock import AsyncMock, MagicMock
+        from unittest.mock import AsyncMock
 
         from chaser.browser.pool import BrowserPool
 
