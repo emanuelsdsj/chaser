@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import pytest
 
-from chaser.browser.pool import BrowserPool
+from chaser.browser.pool import BrowserPool, _PoolSlot
 from chaser.net.request import Request
 from chaser.net.response import Response
 
@@ -27,6 +27,10 @@ def _make_page(html: str = "<html><body>pool</body></html>", status: int = 200) 
     page.set_extra_http_headers = AsyncMock()
     page.close = AsyncMock()
     return page
+
+
+def _make_slot(html: str = "<html><body>pool</body></html>", status: int = 200) -> _PoolSlot:
+    return _PoolSlot(context=None, page=_make_page(html=html, status=status))
 
 
 def _make_browser(pages: list[AsyncMock]) -> AsyncMock:
@@ -61,6 +65,7 @@ def test_defaults() -> None:
     assert pool._headless is True
     assert pool._timeout == 30.0
     assert pool._wait_until == "load"
+    assert pool._stealth is None
 
 
 def test_custom_params() -> None:
@@ -106,18 +111,17 @@ async def test_fetch_without_context_manager_raises() -> None:
 
 @pytest.mark.asyncio
 async def test_aenter_preallocates_pages() -> None:
-    pages = [_make_page() for _ in range(3)]
-    browser = _make_browser(pages)
+    slots = [_make_slot() for _ in range(3)]
+    browser = _make_browser([])
     cm, _ = _make_playwright(browser)
 
     pool = BrowserPool(size=3)
-    with patch("chaser.browser.pool.async_playwright", return_value=cm, create=True):
-        pool._playwright = await cm.start()
-        pool._browser = browser
-        for page in pages:
-            await pool._pages.put(page)
+    pool._playwright = await cm.start()
+    pool._browser = browser
+    for slot in slots:
+        await pool._slots.put(slot)
 
-    assert pool._pages.qsize() == 3
+    assert pool._slots.qsize() == 3
     assert browser.new_page.call_count == 0  # we put manually above
 
 
@@ -133,9 +137,9 @@ async def test_aenter_calls_new_page_size_times() -> None:
 
     for _ in range(4):
         page = await browser.new_page()
-        await pool._pages.put(page)
+        await pool._slots.put(_PoolSlot(context=None, page=page))
 
-    assert pool._pages.qsize() == 4
+    assert pool._slots.qsize() == 4
     assert browser.new_page.call_count == 4
 
 
@@ -146,12 +150,10 @@ async def test_aenter_calls_new_page_size_times() -> None:
 
 @pytest.mark.asyncio
 async def test_fetch_returns_response() -> None:
-    page = _make_page()
-    browser = _make_browser([])
     pool = BrowserPool(size=1)
-    pool._browser = browser
+    pool._browser = _make_browser([])
     pool._playwright = MagicMock()
-    await pool._pages.put(page)
+    await pool._slots.put(_make_slot())
 
     response = await pool.fetch(Request(url="https://example.com/"))
 
@@ -162,36 +164,35 @@ async def test_fetch_returns_response() -> None:
 
 @pytest.mark.asyncio
 async def test_page_returned_to_pool_after_success() -> None:
-    page = _make_page()
-    browser = _make_browser([])
+    slot = _make_slot()
     pool = BrowserPool(size=1)
-    pool._browser = browser
+    pool._browser = _make_browser([])
     pool._playwright = MagicMock()
-    await pool._pages.put(page)
+    await pool._slots.put(slot)
 
-    assert pool._pages.qsize() == 1
+    assert pool._slots.qsize() == 1
     await pool.fetch(Request(url="https://example.com/"))
 
-    # Page must be back in the queue — pool size unchanged
-    assert pool._pages.qsize() == 1
-    page.close.assert_not_called()
+    # Slot must be back in the queue — pool size unchanged
+    assert pool._slots.qsize() == 1
+    slot.page.close.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_same_page_reused_across_requests() -> None:
-    page = _make_page()
+    slot = _make_slot()
     browser = _make_browser([])
     pool = BrowserPool(size=1)
     pool._browser = browser
     pool._playwright = MagicMock()
-    await pool._pages.put(page)
+    await pool._slots.put(slot)
 
     await pool.fetch(Request(url="https://example.com/"))
     await pool.fetch(Request(url="https://example.com/page2"))
 
     # new_page should never have been called — same page reused
     browser.new_page.assert_not_called()
-    assert page.goto.call_count == 2
+    assert slot.page.goto.call_count == 2
 
 
 # ---------------------------------------------------------------------------
@@ -201,12 +202,11 @@ async def test_same_page_reused_across_requests() -> None:
 
 @pytest.mark.asyncio
 async def test_headers_cleared_before_each_request() -> None:
-    page = _make_page()
-    browser = _make_browser([])
+    slot = _make_slot()
     pool = BrowserPool(size=1)
-    pool._browser = browser
+    pool._browser = _make_browser([])
     pool._playwright = MagicMock()
-    await pool._pages.put(page)
+    await pool._slots.put(slot)
 
     from chaser.net.headers import Headers
 
@@ -214,24 +214,23 @@ async def test_headers_cleared_before_each_request() -> None:
     await pool.fetch(req)
 
     # First call clears headers, second sets the request-specific ones
-    calls = page.set_extra_http_headers.call_args_list
+    calls = slot.page.set_extra_http_headers.call_args_list
     assert calls[0] == call({})
     assert calls[1].args[0].get("x-token") == "abc"
 
 
 @pytest.mark.asyncio
 async def test_no_extra_headers_call_when_request_has_none() -> None:
-    page = _make_page()
-    browser = _make_browser([])
+    slot = _make_slot()
     pool = BrowserPool(size=1)
-    pool._browser = browser
+    pool._browser = _make_browser([])
     pool._playwright = MagicMock()
-    await pool._pages.put(page)
+    await pool._slots.put(slot)
 
     await pool.fetch(Request(url="https://example.com/"))
 
     # Only the clear call should happen; no second set call
-    page.set_extra_http_headers.assert_called_once_with({})
+    slot.page.set_extra_http_headers.assert_called_once_with({})
 
 
 # ---------------------------------------------------------------------------
@@ -241,37 +240,37 @@ async def test_no_extra_headers_call_when_request_has_none() -> None:
 
 @pytest.mark.asyncio
 async def test_broken_page_replaced_on_error() -> None:
-    bad_page = _make_page()
-    bad_page.goto = AsyncMock(side_effect=RuntimeError("nav failed"))
+    bad_slot = _make_slot()
+    bad_slot.page.goto = AsyncMock(side_effect=RuntimeError("nav failed"))
 
     replacement = _make_page()
     browser = _make_browser([replacement])
     pool = BrowserPool(size=1)
     pool._browser = browser
     pool._playwright = MagicMock()
-    await pool._pages.put(bad_page)
+    await pool._slots.put(bad_slot)
 
     with pytest.raises(RuntimeError, match="nav failed"):
         await pool.fetch(Request(url="https://example.com/"))
 
     # Bad page must be closed
-    bad_page.close.assert_called_once()
+    bad_slot.page.close.assert_called_once()
     # Replacement was created and put back
-    assert pool._pages.qsize() == 1
+    assert pool._slots.qsize() == 1
     browser.new_page.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_pool_usable_after_error() -> None:
-    bad_page = _make_page()
-    bad_page.goto = AsyncMock(side_effect=RuntimeError("boom"))
+    bad_slot = _make_slot()
+    bad_slot.page.goto = AsyncMock(side_effect=RuntimeError("boom"))
 
     good_page = _make_page()
     browser = _make_browser([good_page])
     pool = BrowserPool(size=1)
     pool._browser = browser
     pool._playwright = MagicMock()
-    await pool._pages.put(bad_page)
+    await pool._slots.put(bad_slot)
 
     with pytest.raises(RuntimeError):
         await pool.fetch(Request(url="https://example.com/"))
@@ -303,11 +302,10 @@ async def test_pool_blocks_when_all_pages_busy() -> None:
 
     page.goto = slow_goto
 
-    browser = _make_browser([])
     pool = BrowserPool(size=1)
-    pool._browser = browser
+    pool._browser = _make_browser([])
     pool._playwright = MagicMock()
-    await pool._pages.put(page)
+    await pool._slots.put(_PoolSlot(context=None, page=page))
 
     results = await asyncio.gather(
         pool.fetch(Request(url="https://a.com")),
@@ -326,7 +324,7 @@ async def test_pool_blocks_when_all_pages_busy() -> None:
 
 @pytest.mark.asyncio
 async def test_aexit_closes_all_pages() -> None:
-    pages = [_make_page() for _ in range(3)]
+    slots = [_make_slot() for _ in range(3)]
     browser = _make_browser([])
     pool = BrowserPool(size=3)
     pool._browser = browser
@@ -334,13 +332,13 @@ async def test_aexit_closes_all_pages() -> None:
     playwright_mock.stop = AsyncMock()
     pool._playwright = playwright_mock
 
-    for page in pages:
-        await pool._pages.put(page)
+    for slot in slots:
+        await pool._slots.put(slot)
 
     await pool.__aexit__(None, None, None)
 
-    for page in pages:
-        page.close.assert_called_once()
+    for slot in slots:
+        slot.page.close.assert_called_once()
 
     browser.close.assert_called_once()
     playwright_mock.stop.assert_called_once()
@@ -357,8 +355,7 @@ async def test_aexit_clears_internal_state() -> None:
     pool._browser = browser
     pool._playwright = playwright_mock
 
-    page = _make_page()
-    await pool._pages.put(page)
+    await pool._slots.put(_make_slot())
 
     await pool.__aexit__(None, None, None)
 
