@@ -77,6 +77,9 @@ target-version = "py311"
 select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = ["B008", "UP007", "B027"]
 
+[tool.ruff.lint.per-file-ignores]
+"chaser/browser/stealth.py" = ["E501"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["chaser"]
 
