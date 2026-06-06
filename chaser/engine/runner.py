@@ -57,7 +57,7 @@ class Engine:
         hooks: list[FetchHook] | None = None,
         retry: RetryPolicy | None = None,
         pipeline: Pipeline | None = None,
-        browser: bool = False,
+        browser: bool | BrowserClient = False,
         cache_dir: str | Path | None = None,
         on_stats: Callable[[CrawlStats], Any] | None = None,
         stats_interval: float = 60.0,
@@ -83,7 +83,13 @@ class Engine:
         self._items: list[Item] = []
         self._retry = retry
         self._pipeline = pipeline
-        self._use_browser = browser
+        # browser=True → create default BrowserClient; browser=<instance> → use as-is
+        if isinstance(browser, bool):
+            self._use_browser = browser
+            self._browser_instance: BrowserClient | None = None
+        else:
+            self._use_browser = True
+            self._browser_instance = browser
         self._on_stats = on_stats
         self._stats_interval = stats_interval
         self._metrics = metrics
@@ -170,6 +176,8 @@ class Engine:
         return self._items
 
     def _make_browser_ctx(self) -> BrowserClient:
+        if self._browser_instance is not None:
+            return self._browser_instance
         from chaser.browser.client import BrowserClient
 
         return BrowserClient()
