@@ -18,6 +18,7 @@ from chaser.trapper.base import Trapper
 
 if TYPE_CHECKING:
     from chaser.browser.client import BrowserClient
+    from chaser.frontier.redis_frontier import RedisFrontier
     from chaser.frontier.sqlite import SqliteFrontier
     from chaser.hooks.base import FetchHook
     from chaser.hooks.retry import RetryPolicy
@@ -64,6 +65,7 @@ class Engine:
         frontier_db: str | Path | None = None,
         metrics: ChaserMetrics | None = None,
         job_name: str = "default",
+        frontier_redis: str | None = None,
     ) -> None:
         self._concurrency = concurrency
         self._strategy = strategy
@@ -79,7 +81,8 @@ class Engine:
 
             self._net_kwargs["cache"] = HttpCache(cache_dir)
         self._frontier_db: Path | None = Path(frontier_db) if frontier_db is not None else None
-        self._frontier: Frontier | SqliteFrontier = Frontier(strategy=strategy)  # type: ignore[arg-type]
+        self._frontier_redis: str | None = frontier_redis
+        self._frontier: Frontier | SqliteFrontier | RedisFrontier = Frontier(strategy=strategy)  # type: ignore[arg-type]
         self._items: list[Item] = []
         self._retry = retry
         self._pipeline = pipeline
@@ -114,6 +117,12 @@ class Engine:
             sf = SqliteFrontier(self._frontier_db, strategy=self._strategy)
             sf.open()
             self._frontier = sf
+        elif self._frontier_redis is not None:
+            from chaser.frontier.redis_frontier import RedisFrontier
+
+            rf = RedisFrontier(self._frontier_redis, strategy=self._strategy)
+            await rf.open()
+            self._frontier = rf
         else:
             self._frontier = Frontier(strategy=self._strategy)  # type: ignore[arg-type]
 
@@ -171,6 +180,11 @@ class Engine:
 
                 if isinstance(self._frontier, SqliteFrontier):
                     self._frontier.close()
+            elif self._frontier_redis is not None:
+                from chaser.frontier.redis_frontier import RedisFrontier
+
+                if isinstance(self._frontier, RedisFrontier):
+                    await self._frontier.close()
 
         self.stats._mark_finished()
         return self._items
