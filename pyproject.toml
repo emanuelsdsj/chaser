@@ -43,6 +43,7 @@ db = ["sqlalchemy>=2.0", "aiosqlite>=0.20"]
 metrics = ["prometheus-client>=0.20"]
 redis = ["redis[asyncio]>=5.0"]
 parquet = ["pyarrow>=14.0"]
+cloud = ["aioboto3>=12.0", "google-cloud-storage>=2.10"]
 dev = [
     "pytest>=8.2",
     "pytest-asyncio>=0.23",
@@ -58,6 +59,8 @@ dev = [
     "redis[asyncio]>=5.0",
     "fakeredis>=2.0",
     "pyarrow>=14.0",
+    "aioboto3>=12.0",
+    "google-cloud-storage>=2.10",
 ]
 
 [project.scripts]
@@ -107,6 +110,14 @@ disable_error_code = ["untyped-decorator"]
 
 [[tool.mypy.overrides]]
 module = "chaser.pipeline.store.parquet"
+disable_error_code = ["no-untyped-call"]
+
+[[tool.mypy.overrides]]
+module = "chaser.pipeline.store.s3"
+disable_error_code = ["no-untyped-call"]
+
+[[tool.mypy.overrides]]
+module = "chaser.pipeline.store.gcs"
 disable_error_code = ["no-untyped-call"]
 
 [tool.coverage.run]
