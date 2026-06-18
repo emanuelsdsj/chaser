@@ -209,9 +209,7 @@ class NetClient:
         seen: dict[str, list[str]] = {}
         for k, v in raw.headers.multi_items():
             seen.setdefault(k.lower(), []).append(v)
-        headers = Headers(
-            {k: "\n".join(vs) if k == "set-cookie" else vs[-1] for k, vs in seen.items()}
-        )
+        headers = Headers(seen)
         response = Response(
             url=str(raw.url),
             status=raw.status_code,

@@ -40,16 +40,15 @@ class CookieJarHook(FetchHook):
         return request.copy(headers=Headers(merged))
 
     async def after_response(self, response: Response) -> Response:
-        raw_header = response.headers.get("set-cookie")
-        if not raw_header:
+        cookies = response.headers.getlist("set-cookie")
+        if not cookies:
             return response
         domain = self._domain(response.url)
         async with self._lock:
             bucket = self._jar.setdefault(domain, {})
-            for line in raw_header.split("\n"):
-                if line.strip():
-                    parsed: SimpleCookie = SimpleCookie()
-                    parsed.load(line)
-                    for key, morsel in parsed.items():
-                        bucket[key] = morsel.value
+            for line in cookies:
+                parsed: SimpleCookie = SimpleCookie()
+                parsed.load(line)
+                for key, morsel in parsed.items():
+                    bucket[key] = morsel.value
         return response

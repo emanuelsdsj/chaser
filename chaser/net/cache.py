@@ -118,7 +118,7 @@ class HttpCache:
             "url": response.url,
             "method": request.method,
             "status": response.status,
-            "headers": dict(response.headers),
+            "headers": response.headers.to_dict_list(),
             "encoding": response.encoding,
             "cached_at": time.time(),
             "expires_at": expires_at,
