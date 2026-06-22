@@ -61,6 +61,9 @@ test-results/
 *.log
 logs/
 
+# MkDocs
+site/
+
 # Distribution
 *.whl
 *.tar.gz

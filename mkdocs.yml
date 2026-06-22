@@ -1,0 +1,72 @@
+site_name: Chaser
+site_description: A fast, reliable web crawling framework built on modern Python asyncio
+site_url: https://emanuelsds.github.io/chaser
+repo_url: https://github.com/emanuelsds/chaser
+repo_name: emanuelsds/chaser
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - User Guide:
+    - Trappers: guide/trappers.md
+    - Items & Loaders: guide/items.md
+    - Pipeline & Stores: guide/pipeline.md
+    - Hooks: guide/hooks.md
+    - Browser Rendering: guide/browser.md
+    - Crawl Resume: guide/resume.md
+    - HTTP Cache: guide/cache.md
+    - Configuration: guide/configuration.md
+    - Testing: guide/testing.md
+  - Net Layer: net.md
+  - Cloud & Scale:
+    - Cloud Stores: cloud/stores.md
+    - Redis Frontier: cloud/redis.md
+    - REST API: cloud/api.md
+    - Prometheus Metrics: cloud/metrics.md
+  - CLI Reference: cli.md
+  - Changelog: changelog.md

@@ -71,7 +71,7 @@ print(res.json())    # parsed JSON (raises if not JSON)
 
 ## Headers
 
-`Headers` is a case-insensitive dict. `"Content-Type"` and `"content-type"` are the same key.
+`Headers` is a case-insensitive, multi-value HTTP headers container.
 
 ```python
 from chaser.net.headers import Headers
@@ -80,3 +80,27 @@ h = Headers({"Content-Type": "text/html", "X-Custom": "value"})
 assert h["content-type"] == "text/html"
 assert "CONTENT-TYPE" in h
 ```
+
+### Multi-value headers
+
+Some headers (e.g. `Set-Cookie`) can appear multiple times. Use `getlist()` to retrieve all values:
+
+```python
+h = Headers({"Set-Cookie": "a=1"})
+h.add("Set-Cookie", "b=2")
+h.add("Set-Cookie", "c=3")
+
+h["set-cookie"]          # "c=3"  — last value (dict-style access)
+h.getlist("set-cookie")  # ["a=1", "b=2", "c=3"]
+```
+
+### API
+
+| Method | Description |
+|--------|-------------|
+| `h[key]` | Return the last value for `key` (case-insensitive) |
+| `h[key] = value` | Replace all values for `key` with a single `value` |
+| `h.add(key, value)` | Append `value` without replacing existing values |
+| `h.getlist(key)` | Return all values for `key` as a list; `[]` if absent |
+| `h.to_dict_list()` | Serialise to `dict[str, list[str]]`, preserving all values |
+| `key in h` | Membership test (case-insensitive) |
