@@ -1,8 +1,8 @@
 site_name: Chaser
 site_description: A fast, reliable web crawling framework built on modern Python asyncio
-site_url: https://emanuelsds.github.io/chaser
-repo_url: https://github.com/emanuelsds/chaser
-repo_name: emanuelsds/chaser
+site_url: https://emanuelsdsj.github.io/chaser
+repo_url: https://github.com/emanuelsdsj/chaser
+repo_name: emanuelsdsj/chaser
 edit_uri: edit/main/docs/
 
 theme:

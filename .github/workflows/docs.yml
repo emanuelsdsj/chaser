@@ -8,6 +8,10 @@ on:
       - "mkdocs.yml"
       - "CHANGELOG.md"
 
+concurrency:
+  group: gh-pages
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
