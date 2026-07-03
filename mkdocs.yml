@@ -69,4 +69,5 @@ nav:
     - REST API: cloud/api.md
     - Prometheus Metrics: cloud/metrics.md
   - CLI Reference: cli.md
+  - API Stability: stability.md
   - Changelog: changelog.md

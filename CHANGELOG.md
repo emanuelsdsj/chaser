@@ -7,6 +7,17 @@ Versioning: [Semantic Versioning](https://semver.org/)
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-07-03
+
+### Added
+
+- API stability policy — documented at `docs/stability.md`; `chaser.__all__` is now the pinned public surface for 1.x, enforced by `tests/test_public_api.py`
+- `chaser` top-level package now re-exports `DbStore`, `ParquetStore`, `S3Store`, `GCSStore`, `DuplicateFilter`, `SqliteFrontier`, `RedisFrontier`, `BandwidthThrottleHook`, `FetchHook`, `RequestAborted`, `RobotsDisallowedError`, and `ChaserSettings` — previously only importable from their submodules
+
+### Changed
+
+- Development status classifier bumped from Alpha to Production/Stable
+
 ## [0.0.1] — 2025-05-03
 
 ### Added
