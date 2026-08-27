@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import json
+import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 from chaser.engine.runner import Engine
 from chaser.engine.stats import CrawlStats
+from chaser.hooks import CookieJarHook, FetchHook, RateLimitHook, RobotsHook
 from chaser.item.base import Item
 
 if TYPE_CHECKING:
@@ -23,6 +27,13 @@ class JobStatus(StrEnum):
     failed = "failed"
 
 
+_HOOK_REGISTRY: dict[str, Callable[[], FetchHook]] = {
+    "rate_limit": lambda: RateLimitHook(rate=1.0),
+    "robots": lambda: RobotsHook(),
+    "cookies": lambda: CookieJarHook(),
+}
+
+
 @dataclass
 class CrawlJob:
     id: str
@@ -30,6 +41,8 @@ class CrawlJob:
     status: JobStatus = JobStatus.pending
     items: list[Item] = field(default_factory=list)
     error: str | None = None
+    meta: dict[str, Any] = field(default_factory=dict)
+    created_at: float = field(default_factory=time.monotonic)
     _engine: Engine | None = field(default=None, repr=False)
     _task: asyncio.Task[None] | None = field(default=None, repr=False)
 
@@ -43,9 +56,11 @@ class CrawlJob:
 class CrawlManager:
     """Manages crawl jobs running as asyncio background tasks."""
 
-    def __init__(self, metrics: ChaserMetrics | None = None) -> None:
+    def __init__(self, metrics: ChaserMetrics | None = None, dedup_window: float = 0.0) -> None:
         self._jobs: dict[str, CrawlJob] = {}
         self._metrics = metrics
+        self._dedup_window = dedup_window
+        self._dedup_index: dict[str, str] = {}
 
     def _load_trapper(self, path: str) -> Any:
         """Import a Trapper class from 'module.path:ClassName' notation."""
@@ -58,14 +73,56 @@ class CrawlManager:
             raise AttributeError(f"{cls_name!r} not found in {module_path!r}")
         return cls
 
-    async def start(self, trapper_path: str, engine_kwargs: dict[str, Any]) -> str:
+    def _resolve_hooks(self, names: list[str]) -> list[FetchHook]:
+        resolved = []
+        for name in names:
+            factory = _HOOK_REGISTRY.get(name)
+            if factory is None:
+                raise ValueError(f"unknown hook {name!r}, expected one of {sorted(_HOOK_REGISTRY)}")
+            resolved.append(factory())
+        return resolved
+
+    def _dedup_key(self, trapper_path: str, trapper_kwargs: dict[str, Any] | None) -> str:
+        return f"{trapper_path}|{json.dumps(trapper_kwargs or {}, sort_keys=True)}"
+
+    def _reusable_job(self, key: str) -> str | None:
+        job_id = self._dedup_index.get(key)
+        if job_id is None:
+            return None
+        job = self._jobs.get(job_id)
+        if job is None:
+            return None
+        if job.status in (JobStatus.pending, JobStatus.running):
+            return job_id
+        if job.status == JobStatus.finished and (
+            time.monotonic() - job.created_at < self._dedup_window
+        ):
+            return job_id
+        return None
+
+    async def start(
+        self,
+        trapper_path: str,
+        engine_kwargs: dict[str, Any],
+        trapper_kwargs: dict[str, Any] | None = None,
+        hooks: list[str] | None = None,
+    ) -> str:
         """Start a crawl job and return its ID."""
+        dedup_key = None
+        if self._dedup_window > 0:
+            dedup_key = self._dedup_key(trapper_path, trapper_kwargs)
+            reused = self._reusable_job(dedup_key)
+            if reused is not None:
+                return reused
+
         TrapperClass = self._load_trapper(trapper_path)
-        trapper = TrapperClass()
+        trapper = TrapperClass(**(trapper_kwargs or {}))
 
         job_id = uuid.uuid4().hex[:8]
 
         kw = dict(engine_kwargs)
+        if hooks:
+            kw["hooks"] = self._resolve_hooks(hooks)
         if self._metrics is not None:
             kw["metrics"] = self._metrics
             kw["job_name"] = job_id
@@ -73,12 +130,15 @@ class CrawlManager:
 
         job = CrawlJob(id=job_id, trapper_path=trapper_path, _engine=engine)
         self._jobs[job_id] = job
+        if dedup_key is not None:
+            self._dedup_index[dedup_key] = job_id
 
         async def _run() -> None:
             job.status = JobStatus.running
             try:
                 items = await engine.run(trapper)
                 job.items = items
+                job.meta = trapper.get_meta()
                 job.status = JobStatus.finished
             except asyncio.CancelledError:
                 job.status = JobStatus.cancelled

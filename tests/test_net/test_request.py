@@ -9,6 +9,7 @@ def test_defaults():
     assert r.use_browser is False
     assert r.body is None
     assert r.callback is None
+    assert r.errback is None
     assert isinstance(r.headers, Headers)
     assert isinstance(r.meta, dict)
     assert r.meta == {}
@@ -141,6 +142,7 @@ def test_to_dict_round_trip_full():
         meta={"trapper": "my_trapper", "depth": 2},
         priority=5,
         callback="parse_detail",
+        errback="on_error",
         use_browser=True,
     )
     d = r.to_dict()
@@ -154,6 +156,7 @@ def test_to_dict_round_trip_full():
     assert r2.meta == {"trapper": "my_trapper", "depth": 2}
     assert r2.priority == 5
     assert r2.callback == "parse_detail"
+    assert r2.errback == "on_error"
     assert r2.use_browser is True
 
 
@@ -175,3 +178,4 @@ def test_from_dict_missing_optional_fields():
     assert r.use_browser is False
     assert r.body is None
     assert r.callback is None
+    assert r.errback is None

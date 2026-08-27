@@ -258,11 +258,13 @@ class Engine:
                 except Exception as exc:
                     logger.warning("Browser fetch failed — %s: %s", request.url, exc)
                     self.stats.requests_failed += 1
+                    await self._call_errback(trapper, request, str(exc))
                     return
         else:
             response = await self._fetch_with_retry(net, request)
 
         if response is None:
+            await self._call_errback(trapper, request, "fetch failed")
             return
 
         if response.status >= 400:
@@ -296,6 +298,17 @@ class Engine:
                     trapper_name,
                     type(result).__name__,
                 )
+
+    async def _call_errback(self, trapper: Trapper | None, request: Request, reason: str) -> None:
+        if trapper is None or request.errback is None:
+            return
+        errback = getattr(trapper, request.errback, None)
+        if errback is None:
+            logger.warning(
+                "Trapper %r has no errback %r for %s", trapper.name, request.errback, request.url
+            )
+            return
+        await errback(request, reason)
 
     async def _fetch_with_retry(self, net: NetClient, request: Request) -> Any:
         attempt = 0

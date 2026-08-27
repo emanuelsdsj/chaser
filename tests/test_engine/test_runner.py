@@ -77,6 +77,33 @@ class _CallbackTrpper(Trapper):
         yield _PageItem(url=response.url, status=response.status)
 
 
+class _ErrbackTrpper(Trapper):
+    """Fetches a URL doomed to fail, via a request with a custom errback."""
+
+    name = "errback"
+
+    def __init__(self, url: str) -> None:
+        self.start_urls = []
+        self._url = url
+        self.failures: list[tuple[str, str]] = []
+
+    def start_requests(self) -> list[Request]:
+        return [
+            Request(
+                url=self._url,
+                callback="parse",
+                errback="on_failure",
+                meta={"trapper": self.name},
+            )
+        ]
+
+    async def parse(self, response: Response):  # type: ignore[override]
+        yield _PageItem(url=response.url, status=response.status)
+
+    async def on_failure(self, request: Request, reason: str) -> None:
+        self.failures.append((request.url, reason))
+
+
 class _RaisingTrpper(Trapper):
     """Parse always raises — engine must not crash."""
 
@@ -298,6 +325,38 @@ class TestCustomSettings:
         assert captured == ["explicit/2.0"]
 
 
+class TestErrback:
+    @respx.mock
+    async def test_errback_called_on_fetch_failure(self) -> None:
+        respx.get("http://broken.com/").mock(side_effect=httpx.ConnectError("refused"))
+
+        engine = Engine(concurrency=1, http2=False)
+        trapper = _ErrbackTrpper("http://broken.com/")
+        items = await engine.run(trapper)
+
+        assert items == []
+        assert trapper.failures == [("http://broken.com/", "fetch failed")]
+
+    @respx.mock
+    async def test_errback_not_called_on_success(self) -> None:
+        respx.get("http://ok.com/").mock(return_value=httpx.Response(200, content=b""))
+
+        engine = Engine(concurrency=1, http2=False)
+        trapper = _ErrbackTrpper("http://ok.com/")
+        await engine.run(trapper)
+
+        assert trapper.failures == []
+
+    @respx.mock
+    async def test_no_errback_set_does_not_crash(self) -> None:
+        respx.get("http://broken.com/").mock(side_effect=httpx.ConnectError("refused"))
+
+        engine = Engine(concurrency=1, http2=False)
+        # _SimpleTrpper's requests carry no errback — failure should be silent, not crash
+        items = await engine.run(_SimpleTrpper(["http://broken.com/"]))
+        assert items == []
+
+
 class TestTrapperBase:
     def test_name_auto_derived_from_class(self) -> None:
         class MyFancyTrpper(Trapper):
@@ -325,3 +384,20 @@ class TestTrapperBase:
         reqs = SimpleTrpper().start_requests()
         assert len(reqs) == 2
         assert all(r.meta["trapper"] == "simpletrpper" for r in reqs)
+
+    def test_get_meta_defaults_to_empty_dict(self) -> None:
+        class PlainTrpper(Trapper):
+            async def parse(self, response: Response):  # type: ignore[override]
+                yield  # pragma: no cover
+
+        assert PlainTrpper().get_meta() == {}
+
+    def test_get_meta_can_be_overridden(self) -> None:
+        class MetaTrpper(Trapper):
+            async def parse(self, response: Response):  # type: ignore[override]
+                yield  # pragma: no cover
+
+            def get_meta(self) -> dict[str, object]:
+                return {"failed_sources": ["shopee"]}
+
+        assert MetaTrpper().get_meta() == {"failed_sources": ["shopee"]}

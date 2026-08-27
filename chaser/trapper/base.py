@@ -38,6 +38,15 @@ class Trapper(ABC):
     async def close(self) -> None:
         """Called once after the crawl finishes. Override for teardown."""
 
+    def get_meta(self) -> dict[str, Any]:
+        """Arbitrary metadata about the run, read after the crawl finishes.
+
+        Override to surface anything beyond scraped items — e.g. which sources
+        a search-style trapper couldn't reach. Exposed by ``CrawlManager``/the
+        REST API as ``CrawlResponse.meta``.
+        """
+        return {}
+
     def start_requests(self) -> list[Any]:
         """Produce initial requests from ``start_urls``.
 

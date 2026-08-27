@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -14,15 +15,17 @@ app = FastAPI(
     description="REST interface for managing and monitoring Chaser crawl jobs.",
 )
 
+_dedup_window = float(os.environ.get("CHASER_API_DEDUP_WINDOW", "0"))
+
 try:
     from chaser.metrics.collector import ChaserMetrics as _ChaserMetrics
 
     _metrics = _ChaserMetrics()
-    _manager = CrawlManager(metrics=_metrics)
+    _manager = CrawlManager(metrics=_metrics, dedup_window=_dedup_window)
     app.mount("/metrics", _metrics.make_asgi_app())
 except ImportError:
     _metrics = None  # type: ignore[assignment]
-    _manager = CrawlManager()
+    _manager = CrawlManager(dedup_window=_dedup_window)
 
 
 # ---------------------------------------------------------------------------
@@ -38,6 +41,8 @@ class StartRequest(BaseModel):
     proxy: str | None = None
     cache_dir: str | None = None
     frontier_db: str | None = None
+    trapper_kwargs: dict[str, Any] | None = None
+    hooks: list[str] | None = None
 
 
 class StatsPayload(BaseModel):
@@ -60,6 +65,7 @@ class CrawlResponse(BaseModel):
     stats: StatsPayload
     items_count: int
     error: str | None = None
+    meta: dict[str, Any] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -87,6 +93,7 @@ def _build_crawl_response(job: Any) -> CrawlResponse:
         ),
         items_count=len(job.items),
         error=job.error,
+        meta=job.meta,
     )
 
 
@@ -116,8 +123,13 @@ async def start_crawl(body: StartRequest) -> dict[str, str]:
         engine_kwargs["frontier_db"] = body.frontier_db
 
     try:
-        job_id = await _manager.start(body.trapper, engine_kwargs)
-    except (ImportError, AttributeError, ValueError) as exc:
+        job_id = await _manager.start(
+            body.trapper,
+            engine_kwargs,
+            trapper_kwargs=body.trapper_kwargs,
+            hooks=body.hooks,
+        )
+    except (ImportError, AttributeError, ValueError, TypeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     return {"id": job_id}

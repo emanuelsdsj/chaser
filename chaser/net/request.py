@@ -18,6 +18,7 @@ class Request:
     meta: dict[str, Any] = field(default_factory=dict)
     priority: int = 0
     callback: str | None = None
+    errback: str | None = None
     use_browser: bool = False
 
     def __post_init__(self) -> None:
@@ -63,6 +64,7 @@ class Request:
             "meta": self.meta,
             "priority": self.priority,
             "callback": self.callback,
+            "errback": self.errback,
             "use_browser": self.use_browser,
         }
 
@@ -77,6 +79,7 @@ class Request:
             meta=data.get("meta") or {},
             priority=data.get("priority", 0),
             callback=data.get("callback"),
+            errback=data.get("errback"),
             use_browser=data.get("use_browser", False),
         )
 

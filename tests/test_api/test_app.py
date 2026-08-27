@@ -86,6 +86,32 @@ def test_start_crawl_creates_job(client: TestClient) -> None:
     assert r.json() == {"id": "deadbeef"}
 
 
+def test_start_crawl_passes_trapper_kwargs_and_hooks(client: TestClient) -> None:
+    with patch.object(
+        CrawlManager, "start", new_callable=AsyncMock, return_value="deadbeef"
+    ) as start_mock:
+        r = client.post(
+            "/crawls",
+            json={
+                "trapper": "mymod:MyTrapper",
+                "trapper_kwargs": {"query": "iphone 17 pro"},
+                "hooks": ["rate_limit", "robots"],
+            },
+        )
+    assert r.status_code == 201
+    _, kwargs = start_mock.call_args
+    assert kwargs["trapper_kwargs"] == {"query": "iphone 17 pro"}
+    assert kwargs["hooks"] == ["rate_limit", "robots"]
+
+
+def test_start_crawl_unknown_hook_returns_422(client: TestClient) -> None:
+    with patch.object(
+        CrawlManager, "start", new_callable=AsyncMock, side_effect=ValueError("unknown hook")
+    ):
+        r = client.post("/crawls", json={"trapper": "mymod:MyTrapper", "hooks": ["nope"]})
+    assert r.status_code == 422
+
+
 # ---------------------------------------------------------------------------
 # GET /crawls/{id}
 # ---------------------------------------------------------------------------
@@ -107,6 +133,17 @@ def test_get_crawl_returns_stats(client: TestClient) -> None:
     assert data["status"] == "finished"
     assert data["trapper"] == "mymod:MyTrapper"
     assert "stats" in data
+    assert data["meta"] == {}
+
+
+def test_get_crawl_returns_meta_when_set(client: TestClient) -> None:
+    job = _make_job(JobStatus.finished)
+    job.meta = {"failed_sources": {"shopee": "not implemented yet"}}
+    _manager._jobs[job.id] = job
+
+    r = client.get(f"/crawls/{job.id}")
+    assert r.status_code == 200
+    assert r.json()["meta"] == {"failed_sources": {"shopee": "not implemented yet"}}
 
 
 # ---------------------------------------------------------------------------
