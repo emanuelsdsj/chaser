@@ -4,6 +4,7 @@ import os
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from chaser import __version__
@@ -14,6 +15,20 @@ app = FastAPI(
     version=__version__,
     description="REST interface for managing and monitoring Chaser crawl jobs.",
 )
+
+
+def _parse_cors_origins(raw: str) -> list[str]:
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
+
+_cors_origins = _parse_cors_origins(os.environ.get("CHASER_API_CORS_ORIGINS", ""))
+if _cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 _dedup_window = float(os.environ.get("CHASER_API_DEDUP_WINDOW", "0"))
 

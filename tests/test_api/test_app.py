@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from chaser.api.app import _manager, app
+from chaser.api.app import _manager, _parse_cors_origins, app
 from chaser.api.manager import CrawlJob, CrawlManager, JobStatus
 from chaser.engine.stats import CrawlStats
 from chaser.item.base import Item
@@ -51,6 +51,59 @@ def test_root_returns_service_name(client: TestClient) -> None:
     r = client.get("/")
     assert r.status_code == 200
     assert r.json()["service"] == "chaser"
+
+
+# ---------------------------------------------------------------------------
+# CORS — CHASER_API_CORS_ORIGINS
+# ---------------------------------------------------------------------------
+
+
+def test_parse_cors_origins_empty_by_default() -> None:
+    assert _parse_cors_origins("") == []
+
+
+def test_parse_cors_origins_splits_and_strips() -> None:
+    assert _parse_cors_origins("https://a.com, https://b.com ,,") == [
+        "https://a.com",
+        "https://b.com",
+    ]
+
+
+def test_cors_middleware_absent_by_default() -> None:
+    # chaser.api.app is a long-lived singleton other tests already sent requests
+    # through, so CORS can't be re-wired here via env var + reload without
+    # re-running module-level side effects (e.g. Prometheus metric registration).
+    # This only covers the default (unconfigured) state of that real app instance.
+    from fastapi.middleware.cors import CORSMiddleware
+
+    assert not any(m.cls is CORSMiddleware for m in app.user_middleware)
+
+
+def test_cors_middleware_sends_allow_origin_header_when_configured() -> None:
+    """Same wiring app.py does when CHASER_API_CORS_ORIGINS is set, exercised on an
+    isolated app instance to confirm it actually produces CORS response headers."""
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+
+    probe = FastAPI()
+    probe.add_middleware(
+        CORSMiddleware,
+        allow_origins=_parse_cors_origins("https://example.com"),
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    @probe.get("/ping")
+    def ping() -> dict[str, bool]:
+        return {"ok": True}
+
+    probe_client = TestClient(probe)
+
+    allowed = probe_client.get("/ping", headers={"Origin": "https://example.com"})
+    assert allowed.headers["access-control-allow-origin"] == "https://example.com"
+
+    blocked = probe_client.get("/ping", headers={"Origin": "https://evil.example"})
+    assert "access-control-allow-origin" not in blocked.headers
 
 
 # ---------------------------------------------------------------------------
