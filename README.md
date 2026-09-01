@@ -5,6 +5,11 @@ A web crawling and data extraction framework built on modern Python asyncio.
 HTTP/2 by default. Pydantic-validated items. Bloom filter dedup.
 No legacy event loop libraries, just plain asyncio.
 
+**[Live demo →](https://chaser-real-example.vercel.app)** — price and job search
+aggregated from multiple real sources (Kabum, Kalunga, Americanas, RemoteOK,
+Arbeitnow), both running through the same generic `/crawls` REST API with zero
+trapper-specific code in it.
+
 ---
 
 ## Why
@@ -395,7 +400,7 @@ Not a linear chain — the frontier drives the crawl, the engine dispatches.
 ## Development
 
 ```bash
-git clone https://github.com/emanuelsds/chaser
+git clone https://github.com/emanuelsdsj/chaser
 cd chaser
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
