@@ -408,6 +408,8 @@ pre-commit install
 pytest
 ```
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for bug reports, feature requests, and the pull request checklist.
+
 ## License
 
 MIT

@@ -1,0 +1,54 @@
+name: Bug report
+description: Something isn't working the way it should
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug. What did you expect instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: A minimal code snippet or command sequence that triggers the bug.
+      render: python
+    validations:
+      required: true
+
+  - type: input
+    id: chaser-version
+    attributes:
+      label: Chaser version
+      description: Output of `python -c "import chaser; print(chaser.__version__)"`
+      placeholder: "1.1.1"
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      placeholder: "3.12.3"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Ubuntu 24.04 / macOS 15 / Windows 11"
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Full traceback if there is one. This will be formatted as code automatically.
+      render: shell
+    validations:
+      required: false
