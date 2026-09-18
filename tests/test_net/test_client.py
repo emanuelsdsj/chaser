@@ -253,9 +253,11 @@ class TestPerRequestTimeout:
             raise httpx.ReadTimeout("timed out", request=None)
 
         async with NetClient(http2=False) as client:
-            with patch.object(client._client, "request", _timeout):
-                with pytest.raises(TimeoutFetchError):
-                    await client.fetch(Request("http://slow.com/"))
+            with (
+                patch.object(client._client, "request", _timeout),
+                pytest.raises(TimeoutFetchError),
+            ):
+                await client.fetch(Request("http://slow.com/"))
 
     @pytest.mark.asyncio
     async def test_meta_timeout_passed_to_httpx(self) -> None:
