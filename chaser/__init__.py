@@ -34,7 +34,7 @@ from chaser.trapper.base import Trapper
 from chaser.trapper.crawl import CrawlTrapper
 from chaser.trapper.sitemap import SitemapTrapper
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 __all__ = [
     "Engine",
