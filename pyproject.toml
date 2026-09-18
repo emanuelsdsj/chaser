@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "chaser"
+name = "chaser-crawler"
 dynamic = ["version"]
 description = "A fast, reliable web crawling framework built on modern Python asyncio"
 readme = "README.md"
@@ -72,9 +72,9 @@ dev = [
 chaser = "chaser.cli.main:app"
 
 [project.urls]
-Homepage = "https://github.com/emanuelsds/chaser"
-Issues = "https://github.com/emanuelsds/chaser/issues"
-Changelog = "https://github.com/emanuelsds/chaser/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/emanuelsdsj/chaser"
+Issues = "https://github.com/emanuelsdsj/chaser/issues"
+Changelog = "https://github.com/emanuelsdsj/chaser/blob/main/CHANGELOG.md"
 
 [tool.hatch.version]
 path = "chaser/__init__.py"

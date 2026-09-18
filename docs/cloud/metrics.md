@@ -5,7 +5,7 @@ Chaser exposes crawl metrics in standard Prometheus text format. Every metric is
 ## Setup
 
 ```bash
-pip install "chaser[api,metrics]"
+pip install "chaser-crawler[api,metrics]"
 chaser serve
 ```
 

@@ -5,7 +5,7 @@ For JavaScript-heavy pages that are empty without a browser, Chaser integrates P
 ## Setup
 
 ```bash
-pip install "chaser[browser]"
+pip install "chaser-crawler[browser]"
 playwright install chromium
 ```
 

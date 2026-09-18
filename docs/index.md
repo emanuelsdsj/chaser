@@ -21,19 +21,19 @@ Chaser is a clean rewrite with none of that baggage:
 ## Install
 
 ```bash
-pip install chaser
+pip install chaser-crawler
 ```
 
 With optional extras:
 
 ```bash
-pip install "chaser[browser]"    # Playwright for JS-heavy pages
-pip install "chaser[api]"        # REST API server
-pip install "chaser[metrics]"    # Prometheus metrics
-pip install "chaser[db]"         # async SQLAlchemy store
-pip install "chaser[redis]"      # distributed Redis frontier
-pip install "chaser[parquet]"    # Parquet output via pyarrow
-pip install "chaser[cloud]"      # S3 and GCS stores
+pip install "chaser-crawler[browser]"    # Playwright for JS-heavy pages
+pip install "chaser-crawler[api]"        # REST API server
+pip install "chaser-crawler[metrics]"    # Prometheus metrics
+pip install "chaser-crawler[db]"         # async SQLAlchemy store
+pip install "chaser-crawler[redis]"      # distributed Redis frontier
+pip install "chaser-crawler[parquet]"    # Parquet output via pyarrow
+pip install "chaser-crawler[cloud]"      # S3 and GCS stores
 ```
 
 ## Quick start

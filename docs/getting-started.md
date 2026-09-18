@@ -3,7 +3,7 @@
 ## Installation
 
 ```bash
-pip install chaser
+pip install chaser-crawler
 ```
 
 Python 3.11 or higher is required.

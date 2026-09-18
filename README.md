@@ -24,23 +24,23 @@ Chaser is a clean rewrite with none of that baggage.
 ## Install
 
 ```bash
-pip install chaser
+pip install chaser-crawler
 
 # with browser support (Playwright)
-pip install "chaser[browser]"
+pip install "chaser-crawler[browser]"
 playwright install chromium
 
 # with REST API and process management
-pip install "chaser[api]"
+pip install "chaser-crawler[api]"
 
 # with Prometheus metrics
-pip install "chaser[metrics]"
+pip install "chaser-crawler[metrics]"
 
 # with SQLAlchemy store
-pip install "chaser[db]"
+pip install "chaser-crawler[db]"
 
 # everything
-pip install "chaser[browser,api,metrics,db]"
+pip install "chaser-crawler[browser,api,metrics,db]"
 ```
 
 ## Quick start
@@ -253,7 +253,7 @@ engine = Engine(browser=True)
 await engine.run(JSTrapper())
 ```
 
-Requires `pip install "chaser[browser]" && playwright install chromium`.
+Requires `pip install "chaser-crawler[browser]" && playwright install chromium`.
 
 The browser pool reuses Playwright pages across requests instead of opening and
 closing a full browser context for each URL, which makes it substantially faster
@@ -264,7 +264,7 @@ on crawls with many browser requests.
 Start a long-running API server to manage and monitor crawl jobs over HTTP:
 
 ```bash
-pip install "chaser[api]"
+pip install "chaser-crawler[api]"
 chaser serve
 ```
 
@@ -293,10 +293,10 @@ curl http://localhost:8000/crawls/a1b2c3d4
 ## Prometheus metrics
 
 Chaser exposes a `/metrics` endpoint in standard Prometheus text format when
-`chaser[metrics]` is installed alongside `chaser[api]`:
+`chaser-crawler[metrics]` is installed alongside `chaser-crawler[api]`:
 
 ```bash
-pip install "chaser[api,metrics]"
+pip install "chaser-crawler[api,metrics]"
 chaser serve
 curl http://localhost:8000/metrics
 ```

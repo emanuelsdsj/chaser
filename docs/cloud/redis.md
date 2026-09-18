@@ -5,7 +5,7 @@ The default in-memory frontier and the SQLite frontier are single-process. For c
 ## Setup
 
 ```bash
-pip install "chaser[redis]"
+pip install "chaser-crawler[redis]"
 ```
 
 Pass the Redis URL to the Engine:

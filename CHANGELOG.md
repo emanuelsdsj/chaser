@@ -7,6 +7,24 @@ Versioning: [Semantic Versioning](https://semver.org/)
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-09-18
+
+### Added
+
+- `POST /crawls` accepts `trapper_kwargs` (constructor args for the trapper) and `hooks` (`rate_limit`/`robots`/`cookies`, resolved via a small registry), so the REST API can drive any trapper without bespoke code per deployment
+- `CrawlManager` gains an opt-in `dedup_window` to collapse identical submissions into the same job
+- `Request.errback`, called when a fetch fails outright
+- `Trapper.get_meta()` (non-abstract), surfaced as `CrawlJob.meta` / `CrawlResponse.meta` — a generic channel for a trapper to report things like per-source failures once a run finishes
+- `CHASER_API_CORS_ORIGINS` — configurable CORS for the REST API (comma-separated origins, off by default)
+
+### Fixed
+
+- `RobotsHook` no longer treats a WAF 403 on the robots.txt *fetch itself* as the site disallowing everything — it now fetches with a real browser User-Agent and, on any HTTP error response, applies the same "couldn't read the rules, so none are enforced" fallback the class already documented for network failures
+
+### Changed
+
+- Published on PyPI as `chaser-crawler` (the `chaser` name was already taken) — `import chaser` and the `chaser` CLI command are unaffected, only the install name changes: `pip install chaser-crawler`
+
 ## [1.0.0] — 2026-07-03
 
 ### Added

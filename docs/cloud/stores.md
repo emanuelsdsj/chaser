@@ -7,7 +7,7 @@ Chaser can write items directly to Amazon S3, Google Cloud Storage, or Parquet f
 `S3Store` accumulates items in a local temp file, then uploads it as a single object when the crawl finishes.
 
 ```bash
-pip install "chaser[cloud]"
+pip install "chaser-crawler[cloud]"
 ```
 
 ```python
@@ -21,7 +21,7 @@ pipeline = Pipeline([
 Format is inferred from the key extension: `.parquet` → Parquet, everything else → JSONL.
 
 ```python
-# Parquet output (requires chaser[parquet] as well)
+# Parquet output (requires chaser-crawler[parquet] as well)
 S3Store("my-bucket", "crawls/run-001/items.parquet")
 ```
 
@@ -57,7 +57,7 @@ S3Store(
 `GCSStore` works the same way — accumulate locally, upload on close.
 
 ```bash
-pip install "chaser[cloud]"
+pip install "chaser-crawler[cloud]"
 ```
 
 ```python
@@ -88,7 +88,7 @@ GCSStore uses [Application Default Credentials](https://cloud.google.com/docs/au
 For columnar output without uploading to cloud storage:
 
 ```bash
-pip install "chaser[parquet]"
+pip install "chaser-crawler[parquet]"
 ```
 
 ```python

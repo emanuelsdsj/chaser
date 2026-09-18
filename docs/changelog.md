@@ -23,13 +23,13 @@ Versioning: [Semantic Versioning](https://semver.org/)
 - `Pipeline` + `Stage` — async item processing chain
 - `JsonlStore` — streaming JSONL output with append-safe concurrent writes
 - `CsvStore` — streaming CSV with auto-header detection
-- `DbStore` — async SQLAlchemy sink with auto table creation (via `chaser[db]` extra)
+- `DbStore` — async SQLAlchemy sink with auto table creation (via `chaser-crawler[db]` extra)
 - `RetryPolicy` — exponential backoff with jitter
 - `RateLimitHook` — per-domain token bucket rate limiting
 - `CookieJarHook` — per-domain cookie jar, reads `Set-Cookie`, injects on next requests
 - `RobotsHook` — cached `robots.txt` compliance per domain
 - `ProxyPool` — round-robin proxy rotation with failure tracking
-- `BrowserClient` — Playwright-based fetch client returning same `Response` interface (via `chaser[browser]` extra)
+- `BrowserClient` — Playwright-based fetch client returning same `Response` interface (via `chaser-crawler[browser]` extra)
 - `ChaserSettings` — configuration via `[tool.chaser]` in `pyproject.toml` and `CHASER_*` env vars
 - CLI: `chaser run`, `chaser shell`, `chaser version`
 - `Response.urljoin()` for relative URL resolution

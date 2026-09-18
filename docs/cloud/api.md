@@ -5,7 +5,7 @@ The Chaser API server manages crawl jobs over HTTP. Start it, submit Trapper cla
 ## Setup
 
 ```bash
-pip install "chaser[api]"
+pip install "chaser-crawler[api]"
 chaser serve
 ```
 
@@ -120,4 +120,4 @@ The API server exposes Swagger UI at `http://localhost:8000/docs` and ReDoc at `
 
 ## Prometheus metrics
 
-When `chaser[metrics]` is also installed, the server exposes a `/metrics` endpoint in Prometheus text format. See [Prometheus Metrics](metrics.md) for details.
+When `chaser-crawler[metrics]` is also installed, the server exposes a `/metrics` endpoint in Prometheus text format. See [Prometheus Metrics](metrics.md) for details.

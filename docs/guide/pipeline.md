@@ -44,7 +44,7 @@ DbStore("sqlite+aiosqlite:///crawl.db", table="articles")
 DbStore("postgresql+asyncpg://user:pass@host/db", table="articles")
 ```
 
-Requires `pip install "chaser[db]"`.
+Requires `pip install "chaser-crawler[db]"`.
 
 ### ParquetStore
 
@@ -56,7 +56,7 @@ from chaser.pipeline.store.parquet import ParquetStore
 ParquetStore("output.parquet")
 ```
 
-Requires `pip install "chaser[parquet]"`.
+Requires `pip install "chaser-crawler[parquet]"`.
 
 ## Filtering stages
 

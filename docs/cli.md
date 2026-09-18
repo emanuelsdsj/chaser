@@ -67,7 +67,7 @@ Options:
 chaser serve --port 9000 --reload
 ```
 
-Requires `pip install "chaser[api]"`.
+Requires `pip install "chaser-crawler[api]"`.
 
 ## chaser shell
 
