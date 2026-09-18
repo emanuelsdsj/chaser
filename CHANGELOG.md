@@ -9,12 +9,6 @@ Versioning: [Semantic Versioning](https://semver.org/)
 
 ## [1.1.1] — 2026-09-18
 
-### Changed
-
-- No functional changes — republished after the initial 1.1.0 upload had to be removed from PyPI (a version's filename can't be reused once deleted, per PyPI's package-index policy)
-
-## [1.1.0] — 2026-09-18
-
 ### Added
 
 - `POST /crawls` accepts `trapper_kwargs` (constructor args for the trapper) and `hooks` (`rate_limit`/`robots`/`cookies`, resolved via a small registry), so the REST API can drive any trapper without bespoke code per deployment
